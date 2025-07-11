@@ -4,7 +4,12 @@ NAMESPACE ?= default
 KO_DOCKER_REPO ?= ko.local
 
 # Knative versions
-KNATIVE_VERSION ?= v1.18.2
+KNATIVE_VERSION ?= v1.18.0
+
+# Knative urls
+KNATIVE_OPERATOR = https://github.com/knative/operator/releases/download/knative-$(KNATIVE_VERSION)
+KNATIVE_SERVING = https://github.com/knative/serving/releases/download/knative-$(KNATIVE_VERSION)
+KNATIVE_EVENTING = https://github.com/knative/eventing/releases/download/knative-$(KNATIVE_VERSION)
 
 # Default target
 .PHONY: help
@@ -18,16 +23,18 @@ help: ## Show this help message
 .PHONY: setup-knative
 setup-knative: ## Install Knative Serving and Eventing components using the operator
 	@echo "Installing Knative Operator..."
-	kubectl apply -f https://github.com/knative/operator/releases/download/knative-v1.18.2/operator.yaml
+	kubectl apply -f $(KNATIVE_OPERATOR)/operator.yaml
 	@echo "Waiting for Knative Operator to be ready..."
-	kubectl wait --for=condition=ready pod -l app=knative-operator -n knative-operator --timeout=300s
+	kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=knative-operator -n knative-operator --timeout=300s
 	@echo "Installing Knative Serving..."
-	kubectl apply -f config/knative-serving.yaml
+	kubectl apply -f $(KNATIVE_SERVING)/serving-crds.yaml
+	kubectl apply -f $(KNATIVE_SERVING)/serving-core.yaml
 	@echo "Installing Knative Eventing..."
-	kubectl apply -f config/knative-eventing.yaml
+	kubectl apply -f $(KNATIVE_EVENTING)/eventing-crds.yaml
+	kubectl apply -f $(KNATIVE_EVENTING)/eventing-core.yaml
 	@echo "Waiting for Knative components to be ready..."
 	kubectl wait --for=condition=ready pod -l app=controller -n knative-serving --timeout=600s
-	kubectl wait --for=condition=ready pod -l app=controller -n knative-eventing --timeout=600s
+	kubectl wait --for=condition=ready pod -l app=eventing-controller -n knative-eventing --timeout=600s
 	@echo "Knative setup complete!"
 
 .PHONY: check-knative
