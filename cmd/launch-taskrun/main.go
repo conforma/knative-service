@@ -222,9 +222,6 @@ type CloudEventData struct {
 
 type TaskRunConfig struct {
 	PolicyConfiguration             string `json:"POLICY_CONFIGURATION"`
-	PublicKeySecretNs               string `json:"PUBLIC_KEY_SECRET_NS"`
-	PublicKeySecretName             string `json:"PUBLIC_KEY_SECRET_NAME"`
-	PublicKeySecretKey              string `json:"PUBLIC_KEY_SECRET_KEY"`
 	PublicKey                       string `json:"PUBLIC_KEY"`
 	RekorHost                       string `json:"REKOR_HOST"`
 	IgnoreRekor                     string `json:"IGNORE_REKOR"`
@@ -378,15 +375,6 @@ func (s *Service) readConfigMap(ctx context.Context, namespace string) (*TaskRun
 	if val, exists := configMap.Data["IGNORE_REKOR"]; exists {
 		config.IgnoreRekor = val
 	}
-	if val, exists := configMap.Data["PUBLIC_KEY_SECRET_NS"]; exists {
-		config.PublicKeySecretNs = val
-	}
-	if val, exists := configMap.Data["PUBLIC_KEY_SECRET_NAME"]; exists {
-		config.PublicKeySecretName = val
-	}
-	if val, exists := configMap.Data["PUBLIC_KEY_SECRET_KEY"]; exists {
-		config.PublicKeySecretKey = val
-	}
 
 	// Cache the fetched config
 	s.configCache.set(namespace, config)
@@ -397,34 +385,6 @@ func (s *Service) readConfigMap(ctx context.Context, namespace string) (*TaskRun
 func (s *Service) findEcp(snapshot *konflux.Snapshot) (string, error) {
 	ctx := context.Background()
 	return konflux.FindEnterpriseContractPolicy(ctx, s.crtlClient, s.logger, snapshot)
-}
-
-func (s *Service) findKey(config *TaskRunConfig) (string, error) {
-	const (
-		defaultPublicKeySecretNs   = "openshift-pipelines"
-		defaultPublicKeySecretName = "public-key"
-		defaultPublicKeySecretKey  = "cosign.pub"
-	)
-
-	// Use defaults if config values are empty
-	secretNs := config.PublicKeySecretNs
-	if secretNs == "" {
-		secretNs = defaultPublicKeySecretNs
-	}
-
-	secretName := config.PublicKeySecretName
-	if secretName == "" {
-		secretName = defaultPublicKeySecretName
-	}
-
-	secretKey := config.PublicKeySecretKey
-	if secretKey == "" {
-		secretKey = defaultPublicKeySecretKey
-	}
-
-	ctx := context.Background()
-	svk := konflux.NewSecretValueKey(secretNs, secretName, secretKey)
-	return konflux.FindPublicKey(ctx, s.crtlClient, s.logger, svk)
 }
 
 func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfig) (*tektonv1.TaskRun, error) {
@@ -465,20 +425,9 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		s.logger.Info("Found RPA in cluster. Using correct ECP.")
 	}
 
-	publicKey, err := s.findKey(config)
-	if err != nil {
-		// Fall back to config value if lookup fails
-		// (We don't expect this to occur in a correctly configured Konflux
-		// cluster, but let's support using a manually configured key anyhow.)
-		publicKey = config.PublicKey
-		s.logger.Info("Unable to find public key in cluster. Falling back to config.", gozap.Error(err))
-	} else {
-		s.logger.Info("Using public key found in cluster.")
-	}
-
 	params := []tektonv1.Param{
 		{Name: "POLICY_CONFIGURATION", Value: createParamValue(ecp)},
-		{Name: "PUBLIC_KEY", Value: createParamValue(publicKey)},
+		{Name: "PUBLIC_KEY", Value: createParamValue(config.PublicKey)},
 		{Name: "IGNORE_REKOR", Value: createParamValue(config.IgnoreRekor)},
 		{Name: "STRICT", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "true"}},
 		{Name: "INFO", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "true"}},
