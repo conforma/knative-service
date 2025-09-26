@@ -22,18 +22,5 @@ metadata:
 
 data:
   POLICY_CONFIGURATION: "github.com/enterprise-contract/config//slsa3"
+  PUBLIC_KEY: "k8s://openshift-pipelines/public-key"
   IGNORE_REKOR: "true"
-
-  # These will be used to lookup the public key for the Chains
-  # signing secret in the cluster
-  PUBLIC_KEY_SECRET_NS: "openshift-pipelines"
-  PUBLIC_KEY_SECRET_NAME: "public-key"
-  PUBLIC_KEY_SECRET_KEY: "cosign.pub"
-
-  # If the public key lookup fails then this is the key that will
-  # be used as a default
-  PUBLIC_KEY: |
-    -----BEGIN PUBLIC KEY-----
-    MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZP/0htjhVt2y0ohjgtIIgICOtQtA
-    naYJRuLprwIv6FDhZ5yFjYUEtsmoNcW7rx2KM6FOXGsCX3BNc7qhHELT+g==
-    -----END PUBLIC KEY-----
