@@ -51,6 +51,17 @@ setup-knative: ## Install and configure a kind cluster with knative installed
 	@# Create a new one
 	kn quickstart kind
 
+.PHONY: setup-knative-rootless
+setup-knative-rootless: set-rootless-port-access setup-knative ## Configure Podman machine VM for rootless port access and create Knative cluster
+
+.PHONY: set-rootless-port-access
+set-rootless-port-access: ## Configure Podman machine VM for rootless port access
+	@echo "Configuring Podman machine VM for rootless port access..."
+	@echo "This will allow binding to privileged ports (like port 80) in rootless mode"
+	@echo "Adding 'net.ipv4.ip_unprivileged_port_start=80' to Podman machine VM..."
+	@podman machine ssh sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80
+	@echo "✅ Podman machine VM configured for rootless port access"
+
 .PHONY: check-knative
 check-knative: ## Check if Knative is properly installed
 	@echo "Checking Knative installation..."
