@@ -1,0 +1,14 @@
+---
+apiVersion: appstudio.redhat.com/v1alpha1
+kind: ReleasePlan
+metadata:
+  labels:
+    release.appstudio.openshift.io/author: conforma
+    release.appstudio.openshift.io/auto-release: "false"
+    release.appstudio.openshift.io/releasePlanAdmission: rpa-sample
+    release.appstudio.openshift.io/standing-attribution: "true"
+  name: conforma-knative-test
+  namespace: default
+spec:
+  application: application-sample
+  target: default
