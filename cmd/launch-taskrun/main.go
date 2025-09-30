@@ -440,34 +440,6 @@ func (s *Service) findKey(config *TaskRunConfig) (string, error) {
 	return konflux.FindPublicKey(ctx, s.crtlClient, s.logger, svk)
 }
 
-func (s *Service) findVsaSigningKey(config *TaskRunConfig) (string, error) {
-	const (
-		defaultVsaSigningKeySecretNs   = "default"
-		defaultVsaSigningKeySecretName = "vsa-signing-key"
-		defaultVsaSigningKeySecretKey  = "cosign.key"
-	)
-
-	// Use defaults if config values are empty
-	secretNs := config.VsaSigningKeySecretNs
-	if secretNs == "" {
-		secretNs = defaultVsaSigningKeySecretNs
-	}
-
-	secretName := config.VsaSigningKeySecretName
-	if secretName == "" {
-		secretName = defaultVsaSigningKeySecretName
-	}
-
-	secretKey := config.VsaSigningKeySecretKey
-	if secretKey == "" {
-		secretKey = defaultVsaSigningKeySecretKey
-	}
-
-	ctx := context.Background()
-	svk := konflux.NewSecretValueKey(secretNs, secretName, secretKey)
-	return konflux.FindPublicKey(ctx, s.crtlClient, s.logger, svk)
-}
-
 func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfig) (*tektonv1.TaskRun, error) {
 	// Use the raw JSON spec directly
 	specJSON := snapshot.Spec
@@ -538,12 +510,7 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		s.logger.Info("Using public key found in cluster.")
 	}
 
-	vsaSigningKey, err := s.findVsaSigningKey(config)
-	if err != nil {
-		s.logger.Error(err, "Failed to find VSA signing key in cluster")
-		return nil, fmt.Errorf("failed to find VSA signing key: %w", err)
-	}
-	s.logger.Info("Using VSA signing key found in cluster.")
+	s.logger.Info("Using VSA signing key from mounted secret.")
 
 	// Validate VSA upload URL is configured
 	if config.VsaUploadUrl == "" {
@@ -554,7 +521,6 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		{Name: "IMAGES", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: string(specJSON)}},
 		{Name: "POLICY_CONFIGURATION", Value: createParamValue(ecp)},
 		{Name: "PUBLIC_KEY", Value: createParamValue(publicKey)},
-		{Name: "VSA_SIGNING_KEY", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: vsaSigningKey}},
 		{Name: "VSA_UPLOAD_URL", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: config.VsaUploadUrl}},
 		{Name: "IGNORE_REKOR", Value: createParamValue(config.IgnoreRekor)},
 		{Name: "STRICT", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "false"}}, // Don't fail on policy violations
@@ -597,6 +563,14 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 			},
 			Params:             params,
 			ServiceAccountName: "task-runner",
+			Workspaces: []tektonv1.WorkspaceBinding{
+				{
+					Name: "signing-key",
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: "vsa-signing-key",
+					},
+				},
+			},
 		},
 	}, nil
 }
