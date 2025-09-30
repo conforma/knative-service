@@ -24,4 +24,4 @@ resources:
   - trigger.yaml
   - rbac.yaml
   - task-runner-rbac.yaml
-  - vsa-signing-key-secret.yaml
+

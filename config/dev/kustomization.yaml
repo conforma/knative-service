@@ -19,6 +19,7 @@ kind: Kustomization
 
 resources:
   - ../base
+  - vsa-signing-key-secret.yaml
   # These would be present already in a Konflux cluster
   - https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
   - https://raw.githubusercontent.com/konflux-ci/application-api/refs/heads/main/manifests/application-api-customresourcedefinitions.yaml
