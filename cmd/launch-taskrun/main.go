@@ -235,6 +235,10 @@ type TaskRunConfig struct {
 	SingleComponent                 string `json:"SINGLE_COMPONENT"`
 	SingleComponentCustomResource   string `json:"SINGLE_COMPONENT_CUSTOM_RESOURCE"`
 	SingleComponentCustomResourceNs string `json:"SINGLE_COMPONENT_CUSTOM_RESOURCE_NS"`
+	VsaSigningKeySecretNs           string `json:"VSA_SIGNING_KEY_SECRET_NS"`
+	VsaSigningKeySecretName         string `json:"VSA_SIGNING_KEY_SECRET_NAME"`
+	VsaSigningKeySecretKey          string `json:"VSA_SIGNING_KEY_SECRET_KEY"`
+	VsaUploadUrl                    string `json:"VSA_UPLOAD_URL"`
 }
 
 type Service struct {
@@ -375,6 +379,27 @@ func (s *Service) readConfigMap(ctx context.Context, namespace string) (*TaskRun
 	if val, exists := configMap.Data["IGNORE_REKOR"]; exists {
 		config.IgnoreRekor = val
 	}
+	if val, exists := configMap.Data["PUBLIC_KEY_SECRET_NS"]; exists {
+		config.PublicKeySecretNs = val
+	}
+	if val, exists := configMap.Data["PUBLIC_KEY_SECRET_NAME"]; exists {
+		config.PublicKeySecretName = val
+	}
+	if val, exists := configMap.Data["PUBLIC_KEY_SECRET_KEY"]; exists {
+		config.PublicKeySecretKey = val
+	}
+	if val, exists := configMap.Data["VSA_SIGNING_KEY_SECRET_NS"]; exists {
+		config.VsaSigningKeySecretNs = val
+	}
+	if val, exists := configMap.Data["VSA_SIGNING_KEY_SECRET_NAME"]; exists {
+		config.VsaSigningKeySecretName = val
+	}
+	if val, exists := configMap.Data["VSA_SIGNING_KEY_SECRET_KEY"]; exists {
+		config.VsaSigningKeySecretKey = val
+	}
+	if val, exists := configMap.Data["VSA_UPLOAD_URL"]; exists {
+		config.VsaUploadUrl = val
+	}
 
 	// Cache the fetched config
 	s.configCache.set(namespace, config)
@@ -387,6 +412,62 @@ func (s *Service) findEcp(snapshot *konflux.Snapshot) (string, error) {
 	return konflux.FindEnterpriseContractPolicy(ctx, s.crtlClient, s.logger, snapshot)
 }
 
+func (s *Service) findKey(config *TaskRunConfig) (string, error) {
+	const (
+		defaultPublicKeySecretNs   = "openshift-pipelines"
+		defaultPublicKeySecretName = "public-key"
+		defaultPublicKeySecretKey  = "cosign.pub"
+	)
+
+	// Use defaults if config values are empty
+	secretNs := config.PublicKeySecretNs
+	if secretNs == "" {
+		secretNs = defaultPublicKeySecretNs
+	}
+
+	secretName := config.PublicKeySecretName
+	if secretName == "" {
+		secretName = defaultPublicKeySecretName
+	}
+
+	secretKey := config.PublicKeySecretKey
+	if secretKey == "" {
+		secretKey = defaultPublicKeySecretKey
+	}
+
+	ctx := context.Background()
+	svk := konflux.NewSecretValueKey(secretNs, secretName, secretKey)
+	return konflux.FindPublicKey(ctx, s.crtlClient, s.logger, svk)
+}
+
+func (s *Service) findVsaSigningKey(config *TaskRunConfig) (string, error) {
+	const (
+		defaultVsaSigningKeySecretNs   = "default"
+		defaultVsaSigningKeySecretName = "vsa-signing-key"
+		defaultVsaSigningKeySecretKey  = "cosign.key"
+	)
+
+	// Use defaults if config values are empty
+	secretNs := config.VsaSigningKeySecretNs
+	if secretNs == "" {
+		secretNs = defaultVsaSigningKeySecretNs
+	}
+
+	secretName := config.VsaSigningKeySecretName
+	if secretName == "" {
+		secretName = defaultVsaSigningKeySecretName
+	}
+
+	secretKey := config.VsaSigningKeySecretKey
+	if secretKey == "" {
+		secretKey = defaultVsaSigningKeySecretKey
+	}
+
+	ctx := context.Background()
+	svk := konflux.NewSecretValueKey(secretNs, secretName, secretKey)
+	return konflux.FindPublicKey(ctx, s.crtlClient, s.logger, svk)
+}
+
 func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfig) (*tektonv1.TaskRun, error) {
 	// Use the raw JSON spec directly
 	specJSON := snapshot.Spec
@@ -397,8 +478,29 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		return nil, fmt.Errorf("failed to marshal snapshot spec: %w", err)
 	}
 
+	// Extract the primary image from the snapshot spec
+	var snapshotSpec struct {
+		Components []struct {
+			ContainerImage string `json:"containerImage"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(specJSON, &snapshotSpec); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal snapshot spec to extract components: %w", err)
+	}
+
+	if len(snapshotSpec.Components) == 0 {
+		return nil, fmt.Errorf("no components found in snapshot spec")
+	}
+
+	// Use the first component's container image
+	primaryImage := snapshotSpec.Components[0].ContainerImage
+	if primaryImage == "" {
+		return nil, fmt.Errorf("no container image found in first component")
+	}
+
 	// log the specJSON
 	s.logger.Info("SpecJSON", gozap.String("specJSON", string(specJSON)))
+	s.logger.Info("Primary image", gozap.String("image", primaryImage))
 	// Helper function to create ParamValue with validation
 	createParamValue := func(value string) tektonv1.ParamValue {
 		if value == "" {
@@ -425,15 +527,39 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		s.logger.Info("Found RPA in cluster. Using correct ECP.")
 	}
 
+	publicKey, err := s.findKey(config)
+	if err != nil {
+		// Fall back to config value if lookup fails
+		// (We don't expect this to occur in a correctly configured Konflux
+		// cluster, but let's support using a manually configured key anyhow.)
+		publicKey = config.PublicKey
+		s.logger.Info("Unable to find public key in cluster. Falling back to config.", gozap.Error(err))
+	} else {
+		s.logger.Info("Using public key found in cluster.")
+	}
+
+	vsaSigningKey, err := s.findVsaSigningKey(config)
+	if err != nil {
+		s.logger.Error(err, "Failed to find VSA signing key in cluster")
+		return nil, fmt.Errorf("failed to find VSA signing key: %w", err)
+	}
+	s.logger.Info("Using VSA signing key found in cluster.")
+
+	// Validate VSA upload URL is configured
+	if config.VsaUploadUrl == "" {
+		return nil, fmt.Errorf("VSA upload URL is not set")
+	}
+
 	params := []tektonv1.Param{
-		{Name: "POLICY_CONFIGURATION", Value: createParamValue(ecp)},
-		{Name: "PUBLIC_KEY", Value: createParamValue(config.PublicKey)},
-		{Name: "IGNORE_REKOR", Value: createParamValue(config.IgnoreRekor)},
-		{Name: "STRICT", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "true"}},
-		{Name: "INFO", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "true"}},
-		{Name: "show-successes", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "true"}},
-		{Name: "WORKERS", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "1"}},
 		{Name: "IMAGES", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: string(specJSON)}},
+		{Name: "POLICY_CONFIGURATION", Value: createParamValue(ecp)},
+		{Name: "PUBLIC_KEY", Value: createParamValue(publicKey)},
+		{Name: "VSA_SIGNING_KEY", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: vsaSigningKey}},
+		{Name: "VSA_UPLOAD_URL", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: config.VsaUploadUrl}},
+		{Name: "IGNORE_REKOR", Value: createParamValue(config.IgnoreRekor)},
+		{Name: "STRICT", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "false"}}, // Don't fail on policy violations
+		{Name: "WORKERS", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "1"}},
+		{Name: "DEBUG", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "true"}},
 	}
 
 	// Debug logging for all parameters
@@ -443,8 +569,8 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 
 	// Debug logging for resolver parameters
 	resolverParams := []tektonv1.Param{
-		{Name: "bundle", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "quay.io/conforma/tekton-task:latest"}},
-		{Name: "name", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "verify-enterprise-contract"}},
+		{Name: "bundle", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "quay.io/jstuart/tekton-task:latest"}},
+		{Name: "name", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "generate-vsa"}},
 	}
 	for _, param := range resolverParams {
 		s.logger.Info("Resolver param", gozap.String("name", param.Name), gozap.String("type", string(param.Value.Type)), gozap.String("value", param.Value.StringVal))
@@ -452,10 +578,10 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 
 	return &tektonv1.TaskRun{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("verify-enterprise-contract-%s-%d", snapshot.Name, time.Now().Unix()),
+			Name:      fmt.Sprintf("verify-conforma-%s-%d", snapshot.Name, time.Now().Unix()),
 			Namespace: snapshot.Namespace,
 			Labels: map[string]string{
-				"app.kubernetes.io/name":       "verify-and-create-vsa",
+				"app.kubernetes.io/name":       "verify-and-generate-vsa",
 				"app.kubernetes.io/instance":   snapshot.Name,
 				"app.kubernetes.io/component":  "conforma",
 				"app.kubernetes.io/part-of":    "konflux",
@@ -469,7 +595,8 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 					Params:   resolverParams,
 				},
 			},
-			Params: params,
+			Params:             params,
+			ServiceAccountName: "task-runner",
 		},
 	}, nil
 }
