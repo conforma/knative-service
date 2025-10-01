@@ -867,7 +867,6 @@ func TestReadConfigMap_AllFields(t *testing.T) {
 			"POLICY_CONFIGURATION":        "test-policy",
 			"PUBLIC_KEY":                  "test-key",
 			"IGNORE_REKOR":                "true",
-			"VSA_SIGNING_KEY_SECRET_NS":   "test-vsa-ns",
 			"VSA_SIGNING_KEY_SECRET_NAME": "test-vsa-name",
 			"VSA_UPLOAD_URL":              "https://example.com/vsa-upload",
 			"TASK_NAME":                   "test-task",
@@ -887,7 +886,6 @@ func TestReadConfigMap_AllFields(t *testing.T) {
 	assert.Equal(t, "test-policy", config.PolicyConfiguration)
 	assert.Equal(t, "test-key", config.PublicKey)
 	assert.Equal(t, "true", config.IgnoreRekor)
-	assert.Equal(t, "test-vsa-ns", config.VsaSigningKeySecretNs)
 	assert.Equal(t, "test-vsa-name", config.VsaSigningKeySecretName)
 	assert.Equal(t, "https://example.com/vsa-upload", config.VsaUploadUrl)
 	assert.Equal(t, "test-task", config.TaskName)

@@ -224,7 +224,6 @@ type TaskRunConfig struct {
 	PolicyConfiguration     string `json:"POLICY_CONFIGURATION"`
 	PublicKey               string `json:"PUBLIC_KEY"`
 	IgnoreRekor             string `json:"IGNORE_REKOR"`
-	VsaSigningKeySecretNs   string `json:"VSA_SIGNING_KEY_SECRET_NS"`
 	VsaSigningKeySecretName string `json:"VSA_SIGNING_KEY_SECRET_NAME"`
 	VsaUploadUrl            string `json:"VSA_UPLOAD_URL"`
 	TaskName                string `json:"TASK_NAME"`
@@ -368,9 +367,6 @@ func (s *Service) readConfigMap(ctx context.Context, namespace string) (*TaskRun
 	if val, exists := configMap.Data["IGNORE_REKOR"]; exists {
 		config.IgnoreRekor = val
 	}
-	if val, exists := configMap.Data["VSA_SIGNING_KEY_SECRET_NS"]; exists {
-		config.VsaSigningKeySecretNs = val
-	}
 	if val, exists := configMap.Data["VSA_SIGNING_KEY_SECRET_NAME"]; exists {
 		config.VsaSigningKeySecretName = val
 	}
@@ -415,15 +411,8 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		return nil, fmt.Errorf("no components found in snapshot spec")
 	}
 
-	// Use the first component's container image
-	primaryImage := snapshotSpec.Components[0].ContainerImage
-	if primaryImage == "" {
-		return nil, fmt.Errorf("no container image found in first component")
-	}
-
 	// log the specJSON
 	s.logger.Info("SpecJSON", gozap.String("specJSON", string(specJSON)))
-	s.logger.Info("Primary image", gozap.String("image", primaryImage))
 	// Helper function to create ParamValue with validation
 	createParamValue := func(value string) tektonv1.ParamValue {
 		if value == "" {
