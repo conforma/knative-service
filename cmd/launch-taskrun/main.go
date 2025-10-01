@@ -239,6 +239,8 @@ type TaskRunConfig struct {
 	VsaSigningKeySecretName         string `json:"VSA_SIGNING_KEY_SECRET_NAME"`
 	VsaSigningKeySecretKey          string `json:"VSA_SIGNING_KEY_SECRET_KEY"`
 	VsaUploadUrl                    string `json:"VSA_UPLOAD_URL"`
+	TaskBundle                      string `json:"TASK_BUNDLE"`
+	TaskName                        string `json:"TASK_NAME"`
 }
 
 type Service struct {
@@ -400,6 +402,12 @@ func (s *Service) readConfigMap(ctx context.Context, namespace string) (*TaskRun
 	if val, exists := configMap.Data["VSA_UPLOAD_URL"]; exists {
 		config.VsaUploadUrl = val
 	}
+	if val, exists := configMap.Data["TASK_BUNDLE"]; exists {
+		config.TaskBundle = val
+	}
+	if val, exists := configMap.Data["TASK_NAME"]; exists {
+		config.TaskName = val
+	}
 
 	// Cache the fetched config
 	s.configCache.set(namespace, config)
@@ -533,10 +541,18 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		s.logger.Info("TaskRun param", gozap.String("name", param.Name), gozap.String("type", string(param.Value.Type)), gozap.String("value", param.Value.StringVal))
 	}
 
+	// Validate required resolver parameters
+	if config.TaskBundle == "" {
+		return nil, fmt.Errorf("TASK_BUNDLE is required but not set in configmap")
+	}
+	if config.TaskName == "" {
+		return nil, fmt.Errorf("TASK_NAME is required but not set in configmap")
+	}
+
 	// Debug logging for resolver parameters
 	resolverParams := []tektonv1.Param{
-		{Name: "bundle", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "quay.io/jstuart/tekton-task:latest"}},
-		{Name: "name", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "generate-vsa"}},
+		{Name: "bundle", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: config.TaskBundle}},
+		{Name: "name", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: config.TaskName}},
 	}
 	for _, param := range resolverParams {
 		s.logger.Info("Resolver param", gozap.String("name", param.Name), gozap.String("type", string(param.Value.Type)), gozap.String("value", param.Value.StringVal))

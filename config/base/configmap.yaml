@@ -46,3 +46,7 @@ data:
 
   # VSA upload configuration
   VSA_UPLOAD_URL: "rekor@https://rekor.sigstore.dev"
+
+  # Task bundle configuration
+  TASK_BUNDLE: "quay.io/jstuart/tekton-task:latest"
+  TASK_NAME: "generate-vsa"
