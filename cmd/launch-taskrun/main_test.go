@@ -141,13 +141,10 @@ func TestHandleCloudEvent_ValidSnapshot(t *testing.T) {
 
 	// Setup mocks using helper functions
 	configData := map[string]string{
-		"POLICY_CONFIGURATION":   "test-policy",
-		"PUBLIC_KEY_SECRET_NS":   "test-secret-ns",
-		"PUBLIC_KEY_SECRET_NAME": "test-secret-name",
-		"PUBLIC_KEY_SECRET_KEY":  "test-secret-key",
-		"PUBLIC_KEY":             "test-key",
-		"VSA_UPLOAD_URL":         "https://example.com/vsa-upload",
-		"TASK_NAME":              "test-task",
+		"POLICY_CONFIGURATION": "test-policy",
+		"PUBLIC_KEY":           "test-key",
+		"VSA_UPLOAD_URL":       "https://example.com/vsa-upload",
+		"TASK_NAME":            "test-task",
 	}
 	setupConfigMapMock(mockK8s, "test-namespace", configData)
 	setupSuccessfulECPLookupMocks(mockCrtlClient, "test-application", "test-namespace", "test-target")
@@ -201,13 +198,10 @@ func TestReadConfigMap_Success(t *testing.T) {
 	expectedConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "taskrun-config"},
 		Data: map[string]string{
-			"POLICY_CONFIGURATION":   "test-policy",
-			"IGNORE_REKOR":           "true",
-			"PUBLIC_KEY_SECRET_NS":   "test-secret-ns",
-			"PUBLIC_KEY_SECRET_NAME": "test-secret-name",
-			"PUBLIC_KEY_SECRET_KEY":  "test-secret-key",
-			"PUBLIC_KEY":             "test-key",
-			"VSA_UPLOAD_URL":         "https://example.com/vsa-upload",
+			"POLICY_CONFIGURATION": "test-policy",
+			"PUBLIC_KEY":           "test-key",
+			"IGNORE_REKOR":         "true",
+			"VSA_UPLOAD_URL":       "https://example.com/vsa-upload",
 		},
 	}
 
@@ -322,7 +316,6 @@ func TestCreateTaskRun_Success(t *testing.T) {
 	config := &TaskRunConfig{
 		PolicyConfiguration: "test-policy",
 		PublicKey:           "test-key",
-		RekorHost:           "test-rekor",
 		VsaUploadUrl:        "https://example.com/vsa-upload",
 		TaskName:            "test-task",
 	}
@@ -354,7 +347,6 @@ func TestCreateTaskRun_Success(t *testing.T) {
 	assert.Equal(t, "test-target/test-ecp-policy", params["POLICY_CONFIGURATION"])
 	assert.Equal(t, "test-key", params["PUBLIC_KEY"])
 	assert.Equal(t, "true", params["IGNORE_REKOR"])
-	assert.Equal(t, "false", params["STRICT"])
 	assert.Equal(t, "1", params["WORKERS"])
 	assert.Equal(t, "true", params["DEBUG"])
 	assert.Contains(t, params["IMAGES"], "test-app")
@@ -408,13 +400,10 @@ func TestProcessSnapshot_Success(t *testing.T) {
 
 	// Setup mocks using helper functions
 	configData := map[string]string{
-		"POLICY_CONFIGURATION":   "test-policy",
-		"PUBLIC_KEY_SECRET_NS":   "test-secret-ns",
-		"PUBLIC_KEY_SECRET_NAME": "test-secret-name",
-		"PUBLIC_KEY_SECRET_KEY":  "test-secret-key",
-		"PUBLIC_KEY":             "test-key",
-		"VSA_UPLOAD_URL":         "https://example.com/vsa-upload",
-		"TASK_NAME":              "test-task",
+		"POLICY_CONFIGURATION": "test-policy",
+		"PUBLIC_KEY":           "test-key",
+		"VSA_UPLOAD_URL":       "https://example.com/vsa-upload",
+		"TASK_NAME":            "test-task",
 	}
 	setupConfigMapMock(mockK8s, "test-namespace", configData)
 	setupSuccessfulECPLookupMocks(mockCrtlClient, "test-application", "test-namespace", "test-target")
@@ -697,13 +686,10 @@ func TestProcessSnapshot_TektonAPIFailure(t *testing.T) {
 
 	// Setup mocks using helper functions
 	configData := map[string]string{
-		"POLICY_CONFIGURATION":   "test-policy",
-		"PUBLIC_KEY_SECRET_NS":   "test-secret-ns",
-		"PUBLIC_KEY_SECRET_NAME": "test-secret-name",
-		"PUBLIC_KEY_SECRET_KEY":  "test-secret-key",
-		"PUBLIC_KEY":             "test-key",
-		"VSA_UPLOAD_URL":         "https://example.com/vsa-upload",
-		"TASK_NAME":              "test-task",
+		"POLICY_CONFIGURATION": "test-policy",
+		"PUBLIC_KEY":           "test-key",
+		"VSA_UPLOAD_URL":       "https://example.com/vsa-upload",
+		"TASK_NAME":            "test-task",
 	}
 	setupConfigMapMock(mockK8s, "test-namespace", configData)
 	setupSuccessfulECPLookupMocks(mockCrtlClient, "test-application", "test-namespace", "test-target")
@@ -878,28 +864,13 @@ func TestReadConfigMap_AllFields(t *testing.T) {
 	expectedConfigMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "taskrun-config"},
 		Data: map[string]string{
-			"POLICY_CONFIGURATION":                "test-policy",
-			"PUBLIC_KEY_SECRET_NS":                "test-secret-ns",
-			"PUBLIC_KEY_SECRET_NAME":              "test-secret-name",
-			"PUBLIC_KEY_SECRET_KEY":               "test-secret-key",
-			"PUBLIC_KEY":                          "test-key",
-			"REKOR_HOST":                          "test-rekor",
-			"IGNORE_REKOR":                        "true",
-			"STRICT":                              "true",
-			"INFO":                                "true",
-			"TUF_MIRROR":                          "test-tuf",
-			"SSL_CERT_DIR":                        "test-ssl",
-			"CA_TRUST_CONFIGMAP_NAME":             "test-ca-trust",
-			"CA_TRUST_CONFIG_MAP_KEY":             "test-ca-key",
-			"EXTRA_RULE_DATA":                     "test-extra",
-			"SINGLE_COMPONENT":                    "true",
-			"SINGLE_COMPONENT_CUSTOM_RESOURCE":    "test-custom",
-			"SINGLE_COMPONENT_CUSTOM_RESOURCE_NS": "test-custom-ns",
-			"VSA_SIGNING_KEY_SECRET_NS":           "test-vsa-ns",
-			"VSA_SIGNING_KEY_SECRET_NAME":         "test-vsa-name",
-			"VSA_SIGNING_KEY_SECRET_KEY":          "test-vsa-key",
-			"VSA_UPLOAD_URL":                      "https://example.com/vsa-upload",
-			"TASK_NAME":                           "test-task",
+			"POLICY_CONFIGURATION":        "test-policy",
+			"PUBLIC_KEY":                  "test-key",
+			"IGNORE_REKOR":                "true",
+			"VSA_SIGNING_KEY_SECRET_NS":   "test-vsa-ns",
+			"VSA_SIGNING_KEY_SECRET_NAME": "test-vsa-name",
+			"VSA_UPLOAD_URL":              "https://example.com/vsa-upload",
+			"TASK_NAME":                   "test-task",
 		},
 	}
 
@@ -914,14 +885,10 @@ func TestReadConfigMap_AllFields(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "test-policy", config.PolicyConfiguration)
-	assert.Equal(t, "test-secret-ns", config.PublicKeySecretNs)
-	assert.Equal(t, "test-secret-name", config.PublicKeySecretName)
-	assert.Equal(t, "test-secret-key", config.PublicKeySecretKey)
 	assert.Equal(t, "test-key", config.PublicKey)
 	assert.Equal(t, "true", config.IgnoreRekor)
 	assert.Equal(t, "test-vsa-ns", config.VsaSigningKeySecretNs)
 	assert.Equal(t, "test-vsa-name", config.VsaSigningKeySecretName)
-	assert.Equal(t, "test-vsa-key", config.VsaSigningKeySecretKey)
 	assert.Equal(t, "https://example.com/vsa-upload", config.VsaUploadUrl)
 	assert.Equal(t, "test-task", config.TaskName)
 }

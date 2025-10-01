@@ -221,26 +221,13 @@ type CloudEventData struct {
 }
 
 type TaskRunConfig struct {
-	PolicyConfiguration             string `json:"POLICY_CONFIGURATION"`
-	PublicKey                       string `json:"PUBLIC_KEY"`
-	RekorHost                       string `json:"REKOR_HOST"`
-	IgnoreRekor                     string `json:"IGNORE_REKOR"`
-	Strict                          string `json:"STRICT"`
-	Info                            string `json:"INFO"`
-	TufMirror                       string `json:"TUF_MIRROR"`
-	SslCertDir                      string `json:"SSL_CERT_DIR"`
-	CaTrustConfigmapName            string `json:"CA_TRUST_CONFIGMAP_NAME"`
-	CaTrustConfigMapKey             string `json:"CA_TRUST_CONFIG_MAP_KEY"`
-	ExtraRuleData                   string `json:"EXTRA_RULE_DATA"`
-	SingleComponent                 string `json:"SINGLE_COMPONENT"`
-	SingleComponentCustomResource   string `json:"SINGLE_COMPONENT_CUSTOM_RESOURCE"`
-	SingleComponentCustomResourceNs string `json:"SINGLE_COMPONENT_CUSTOM_RESOURCE_NS"`
-	VsaSigningKeySecretNs           string `json:"VSA_SIGNING_KEY_SECRET_NS"`
-	VsaSigningKeySecretName         string `json:"VSA_SIGNING_KEY_SECRET_NAME"`
-	VsaSigningKeySecretKey          string `json:"VSA_SIGNING_KEY_SECRET_KEY"`
-	VsaUploadUrl                    string `json:"VSA_UPLOAD_URL"`
-	TaskBundle                      string `json:"TASK_BUNDLE"`
-	TaskName                        string `json:"TASK_NAME"`
+	PolicyConfiguration     string `json:"POLICY_CONFIGURATION"`
+	PublicKey               string `json:"PUBLIC_KEY"`
+	IgnoreRekor             string `json:"IGNORE_REKOR"`
+	VsaSigningKeySecretNs   string `json:"VSA_SIGNING_KEY_SECRET_NS"`
+	VsaSigningKeySecretName string `json:"VSA_SIGNING_KEY_SECRET_NAME"`
+	VsaUploadUrl            string `json:"VSA_UPLOAD_URL"`
+	TaskName                string `json:"TASK_NAME"`
 }
 
 type Service struct {
@@ -381,29 +368,14 @@ func (s *Service) readConfigMap(ctx context.Context, namespace string) (*TaskRun
 	if val, exists := configMap.Data["IGNORE_REKOR"]; exists {
 		config.IgnoreRekor = val
 	}
-	if val, exists := configMap.Data["PUBLIC_KEY_SECRET_NS"]; exists {
-		config.PublicKeySecretNs = val
-	}
-	if val, exists := configMap.Data["PUBLIC_KEY_SECRET_NAME"]; exists {
-		config.PublicKeySecretName = val
-	}
-	if val, exists := configMap.Data["PUBLIC_KEY_SECRET_KEY"]; exists {
-		config.PublicKeySecretKey = val
-	}
 	if val, exists := configMap.Data["VSA_SIGNING_KEY_SECRET_NS"]; exists {
 		config.VsaSigningKeySecretNs = val
 	}
 	if val, exists := configMap.Data["VSA_SIGNING_KEY_SECRET_NAME"]; exists {
 		config.VsaSigningKeySecretName = val
 	}
-	if val, exists := configMap.Data["VSA_SIGNING_KEY_SECRET_KEY"]; exists {
-		config.VsaSigningKeySecretKey = val
-	}
 	if val, exists := configMap.Data["VSA_UPLOAD_URL"]; exists {
 		config.VsaUploadUrl = val
-	}
-	if val, exists := configMap.Data["TASK_BUNDLE"]; exists {
-		config.TaskBundle = val
 	}
 	if val, exists := configMap.Data["TASK_NAME"]; exists {
 		config.TaskName = val
@@ -418,34 +390,6 @@ func (s *Service) readConfigMap(ctx context.Context, namespace string) (*TaskRun
 func (s *Service) findEcp(snapshot *konflux.Snapshot) (string, error) {
 	ctx := context.Background()
 	return konflux.FindEnterpriseContractPolicy(ctx, s.crtlClient, s.logger, snapshot)
-}
-
-func (s *Service) findKey(config *TaskRunConfig) (string, error) {
-	const (
-		defaultPublicKeySecretNs   = "openshift-pipelines"
-		defaultPublicKeySecretName = "public-key"
-		defaultPublicKeySecretKey  = "cosign.pub"
-	)
-
-	// Use defaults if config values are empty
-	secretNs := config.PublicKeySecretNs
-	if secretNs == "" {
-		secretNs = defaultPublicKeySecretNs
-	}
-
-	secretName := config.PublicKeySecretName
-	if secretName == "" {
-		secretName = defaultPublicKeySecretName
-	}
-
-	secretKey := config.PublicKeySecretKey
-	if secretKey == "" {
-		secretKey = defaultPublicKeySecretKey
-	}
-
-	ctx := context.Background()
-	svk := konflux.NewSecretValueKey(secretNs, secretName, secretKey)
-	return konflux.FindPublicKey(ctx, s.crtlClient, s.logger, svk)
 }
 
 func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfig) (*tektonv1.TaskRun, error) {
@@ -512,17 +456,6 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		s.logger.Info("Found RPA in cluster. Using correct ECP.")
 	}
 
-	publicKey, err := s.findKey(config)
-	if err != nil {
-		// Fall back to config value if lookup fails
-		// (We don't expect this to occur in a correctly configured Konflux
-		// cluster, but let's support using a manually configured key anyhow.)
-		publicKey = config.PublicKey
-		s.logger.Info("Unable to find public key in cluster. Falling back to config.", gozap.Error(err))
-	} else {
-		s.logger.Info("Using public key found in cluster.")
-	}
-
 	s.logger.Info("Using VSA signing key from mounted secret.")
 
 	// Validate VSA upload URL is configured
@@ -533,7 +466,7 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 	params := []tektonv1.Param{
 		{Name: "IMAGES", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: string(specJSON)}},
 		{Name: "POLICY_CONFIGURATION", Value: createParamValue(ecp)},
-		{Name: "PUBLIC_KEY", Value: createParamValue(publicKey)},
+		{Name: "PUBLIC_KEY", Value: createParamValue(config.PublicKey)},
 		{Name: "VSA_UPLOAD_URL", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: config.VsaUploadUrl}},
 		{Name: "IGNORE_REKOR", Value: createParamValue(config.IgnoreRekor)},
 		{Name: "STRICT", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "false"}}, // Don't fail on policy violations
@@ -570,7 +503,7 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 				{
 					Name: "signing-key",
 					Secret: &corev1.SecretVolumeSource{
-						SecretName: "vsa-signing-key",
+						SecretName: config.VsaSigningKeySecretName,
 					},
 				},
 			},

@@ -43,7 +43,7 @@ spec:
     - name: PUBLIC_KEY
       type: string
       description: Public key for signature verification
-
+      default: "k8s://openshift-pipelines/public-key"
 
     - name: VSA_UPLOAD_URL
       type: string
