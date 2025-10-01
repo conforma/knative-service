@@ -449,6 +449,11 @@ func (s *Service) findKey(config *TaskRunConfig) (string, error) {
 }
 
 func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfig) (*tektonv1.TaskRun, error) {
+	// Validate required fields
+	if config.TaskName == "" {
+		return nil, fmt.Errorf("TASK_NAME is required but not set in configmap")
+	}
+
 	// Use the raw JSON spec directly
 	specJSON := snapshot.Spec
 
@@ -541,23 +546,6 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		s.logger.Info("TaskRun param", gozap.String("name", param.Name), gozap.String("type", string(param.Value.Type)), gozap.String("value", param.Value.StringVal))
 	}
 
-	// Validate required resolver parameters
-	if config.TaskBundle == "" {
-		return nil, fmt.Errorf("TASK_BUNDLE is required but not set in configmap")
-	}
-	if config.TaskName == "" {
-		return nil, fmt.Errorf("TASK_NAME is required but not set in configmap")
-	}
-
-	// Debug logging for resolver parameters
-	resolverParams := []tektonv1.Param{
-		{Name: "bundle", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: config.TaskBundle}},
-		{Name: "name", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: config.TaskName}},
-	}
-	for _, param := range resolverParams {
-		s.logger.Info("Resolver param", gozap.String("name", param.Name), gozap.String("type", string(param.Value.Type)), gozap.String("value", param.Value.StringVal))
-	}
-
 	return &tektonv1.TaskRun{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("verify-conforma-%s-%d", snapshot.Name, time.Now().Unix()),
@@ -572,10 +560,9 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		},
 		Spec: tektonv1.TaskRunSpec{
 			TaskRef: &tektonv1.TaskRef{
-				ResolverRef: tektonv1.ResolverRef{
-					Resolver: "bundles",
-					Params:   resolverParams,
-				},
+				Kind:       "Task",
+				Name:       config.TaskName,
+				APIVersion: "tekton.dev/v1",
 			},
 			Params:             params,
 			ServiceAccountName: "task-runner",

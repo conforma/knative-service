@@ -147,7 +147,6 @@ func TestHandleCloudEvent_ValidSnapshot(t *testing.T) {
 		"PUBLIC_KEY_SECRET_KEY":  "test-secret-key",
 		"PUBLIC_KEY":             "test-key",
 		"VSA_UPLOAD_URL":         "https://example.com/vsa-upload",
-		"TASK_BUNDLE":            "quay.io/test/tekton-task:latest",
 		"TASK_NAME":              "test-task",
 	}
 	setupConfigMapMock(mockK8s, "test-namespace", configData)
@@ -325,7 +324,6 @@ func TestCreateTaskRun_Success(t *testing.T) {
 		PublicKey:           "test-key",
 		RekorHost:           "test-rekor",
 		VsaUploadUrl:        "https://example.com/vsa-upload",
-		TaskBundle:          "quay.io/test/tekton-task:latest",
 		TaskName:            "test-task",
 	}
 
@@ -339,15 +337,13 @@ func TestCreateTaskRun_Success(t *testing.T) {
 	assert.NotNil(t, taskRun)
 	assert.Equal(t, "test-namespace", taskRun.Namespace)
 	assert.Contains(t, taskRun.Name, "verify-conforma-test-snapshot-")
-	assert.Equal(t, tektonv1.ResolverName("bundles"), taskRun.Spec.TaskRef.Resolver)
 
-	// Check bundle resolver parameters
-	resolverParams := make(map[string]string)
-	for _, param := range taskRun.Spec.TaskRef.Params {
-		resolverParams[param.Name] = param.Value.StringVal
-	}
-	assert.Equal(t, "quay.io/test/tekton-task:latest", resolverParams["bundle"])
-	assert.Equal(t, "test-task", resolverParams["name"])
+	// Check direct TaskRef instead of bundle resolver
+	assert.Equal(t, tektonv1.TaskKind("Task"), taskRun.Spec.TaskRef.Kind)
+	assert.Equal(t, "test-task", taskRun.Spec.TaskRef.Name)
+	assert.Equal(t, "tekton.dev/v1", taskRun.Spec.TaskRef.APIVersion)
+	assert.Empty(t, taskRun.Spec.TaskRef.Resolver)
+	assert.Empty(t, taskRun.Spec.TaskRef.Params)
 
 	// Check parameters
 	params := make(map[string]string)
@@ -384,6 +380,7 @@ func TestCreateTaskRun_InvalidSpec(t *testing.T) {
 	config := &TaskRunConfig{
 		PolicyConfiguration: "test-policy",
 		VsaUploadUrl:        "https://example.com/vsa-upload",
+		TaskName:            "test-task",
 	}
 
 	taskRun, err := service.createTaskRun(snapshot, config)
@@ -417,7 +414,6 @@ func TestProcessSnapshot_Success(t *testing.T) {
 		"PUBLIC_KEY_SECRET_KEY":  "test-secret-key",
 		"PUBLIC_KEY":             "test-key",
 		"VSA_UPLOAD_URL":         "https://example.com/vsa-upload",
-		"TASK_BUNDLE":            "quay.io/test/tekton-task:latest",
 		"TASK_NAME":              "test-task",
 	}
 	setupConfigMapMock(mockK8s, "test-namespace", configData)
@@ -484,6 +480,7 @@ func TestProcessSnapshot_NoECP(t *testing.T) {
 	configData := map[string]string{
 		"POLICY_CONFIGURATION": "test-policy",
 		"VSA_UPLOAD_URL":       "https://example.com/vsa-upload",
+		"TASK_NAME":            "test-task",
 	}
 	setupConfigMapMock(mockK8s, "test-namespace", configData)
 	setupECPLookupFailureMock(mockCrtlClient)
@@ -706,7 +703,6 @@ func TestProcessSnapshot_TektonAPIFailure(t *testing.T) {
 		"PUBLIC_KEY_SECRET_KEY":  "test-secret-key",
 		"PUBLIC_KEY":             "test-key",
 		"VSA_UPLOAD_URL":         "https://example.com/vsa-upload",
-		"TASK_BUNDLE":            "quay.io/test/tekton-task:latest",
 		"TASK_NAME":              "test-task",
 	}
 	setupConfigMapMock(mockK8s, "test-namespace", configData)
@@ -749,6 +745,7 @@ func TestCreateTaskRun_NoComponents(t *testing.T) {
 	config := &TaskRunConfig{
 		PolicyConfiguration: "test-policy",
 		VsaUploadUrl:        "https://example.com/vsa-upload",
+		TaskName:            "test-task",
 	}
 
 	taskRun, err := service.createTaskRun(snapshot, config)
@@ -777,6 +774,7 @@ func TestCreateTaskRun_EmptyContainerImage(t *testing.T) {
 	config := &TaskRunConfig{
 		PolicyConfiguration: "test-policy",
 		VsaUploadUrl:        "https://example.com/vsa-upload",
+		TaskName:            "test-task",
 	}
 
 	taskRun, err := service.createTaskRun(snapshot, config)
@@ -805,6 +803,7 @@ func TestCreateTaskRun_InvalidJSONSpec(t *testing.T) {
 	config := &TaskRunConfig{
 		PolicyConfiguration: "test-policy",
 		VsaUploadUrl:        "https://example.com/vsa-upload",
+		TaskName:            "test-task",
 	}
 
 	taskRun, err := service.createTaskRun(snapshot, config)
@@ -900,7 +899,6 @@ func TestReadConfigMap_AllFields(t *testing.T) {
 			"VSA_SIGNING_KEY_SECRET_NAME":         "test-vsa-name",
 			"VSA_SIGNING_KEY_SECRET_KEY":          "test-vsa-key",
 			"VSA_UPLOAD_URL":                      "https://example.com/vsa-upload",
-			"TASK_BUNDLE":                         "quay.io/test/tekton-task:latest",
 			"TASK_NAME":                           "test-task",
 		},
 	}
@@ -925,43 +923,7 @@ func TestReadConfigMap_AllFields(t *testing.T) {
 	assert.Equal(t, "test-vsa-name", config.VsaSigningKeySecretName)
 	assert.Equal(t, "test-vsa-key", config.VsaSigningKeySecretKey)
 	assert.Equal(t, "https://example.com/vsa-upload", config.VsaUploadUrl)
-	assert.Equal(t, "quay.io/test/tekton-task:latest", config.TaskBundle)
 	assert.Equal(t, "test-task", config.TaskName)
-}
-
-func TestCreateTaskRun_MissingTaskBundle(t *testing.T) {
-	mockK8s := &mockK8sClient{}
-	mockTekton := &mockTektonClient{}
-	mockCrtlClient := &mockControllerRuntimeClient{}
-	zaplog := &zapLogger{l: zaptest.NewLogger(t)}
-
-	service := NewServiceWithDependencies(mockK8s, mockTekton, mockCrtlClient, zaplog, ServiceConfig{})
-
-	snapshot := &konflux.Snapshot{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-snapshot",
-			Namespace: "test-namespace",
-		},
-		Spec: json.RawMessage(`{"application":"test-app","components":[{"name":"test-component","containerImage":"test-image:latest"}]}`),
-	}
-
-	// Config without TaskBundle - should return error
-	config := &TaskRunConfig{
-		PolicyConfiguration: "test-policy",
-		VsaUploadUrl:        "https://example.com/vsa-upload",
-		TaskName:            "test-task",
-		// TaskBundle is missing
-	}
-
-	// Setup mocks using helper functions
-	setupSuccessfulECPLookupMocks(mockCrtlClient, "test-app", "test-namespace", "test-target")
-	setupPublicKeySecretNotFoundMock(mockCrtlClient, "openshift-pipelines", "public-key")
-
-	taskRun, err := service.createTaskRun(snapshot, config)
-
-	assert.Error(t, err)
-	assert.Nil(t, taskRun)
-	assert.Contains(t, err.Error(), "TASK_BUNDLE is required but not set in configmap")
 }
 
 func TestCreateTaskRun_MissingTaskName(t *testing.T) {
@@ -984,7 +946,6 @@ func TestCreateTaskRun_MissingTaskName(t *testing.T) {
 	config := &TaskRunConfig{
 		PolicyConfiguration: "test-policy",
 		VsaUploadUrl:        "https://example.com/vsa-upload",
-		TaskBundle:          "quay.io/test/tekton-task:latest",
 		// TaskName is missing
 	}
 

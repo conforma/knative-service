@@ -186,6 +186,9 @@ test-local: ## Test local deployment with sample data and follow TaskRun logs
 		POD_NAME=$$(kubectl get pods -n $(NAMESPACE) -l tekton.dev/taskRun=$$TASKRUN_NAME -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo ""); \
 		if [ -n "$$POD_NAME" ]; then \
 			echo "📦 Found pod: $$POD_NAME"; \
+			echo "⏳ Waiting for pod to be ready..."; \
+			kubectl wait --for=condition=ready pod $$POD_NAME -n $(NAMESPACE) --timeout 300s; \
+			echo "✅ Pod is ready!"; \
 			echo "📝 Following pod logs (Ctrl+C to stop):"; \
 			kubectl logs -f $$POD_NAME -n $(NAMESPACE); \
 		else \

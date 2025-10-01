@@ -24,4 +24,5 @@ resources:
   - trigger.yaml
   - rbac.yaml
   - task-runner-rbac.yaml
+  - generate-vsa.yaml
 
