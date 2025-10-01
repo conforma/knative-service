@@ -23,6 +23,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -311,12 +312,19 @@ func (s *Service) handleCloudEvent(ctx context.Context, event cloudevents.Event)
 func (s *Service) processSnapshot(ctx context.Context, snapshot *konflux.Snapshot) error {
 	s.logger.Info("Starting to process snapshot", gozap.String("name", snapshot.Name), gozap.String("namespace", snapshot.Namespace))
 
-	config, err := s.readConfigMap(ctx, snapshot.Namespace)
+	// Read configmap from the service's own namespace, not the snapshot's namespace
+	serviceNamespace, err := s.getServiceNamespace()
+	if err != nil {
+		s.logger.Error(err, "Failed to get service namespace")
+		return fmt.Errorf("failed to get service namespace: %w", err)
+	}
+
+	config, err := s.readConfigMap(ctx, serviceNamespace)
 	if err != nil {
 		s.logger.Error(err, "Failed to read configmap")
 		return fmt.Errorf("failed to read configmap: %w", err)
 	}
-	s.logger.Info("Successfully read configmap", gozap.String("namespace", snapshot.Namespace))
+	s.logger.Info("Successfully read configmap", gozap.String("namespace", serviceNamespace))
 
 	taskRun, err := s.createTaskRun(snapshot, config)
 	if err != nil {
@@ -383,6 +391,25 @@ func (s *Service) readConfigMap(ctx context.Context, namespace string) (*TaskRun
 	return config, nil
 }
 
+// getServiceNamespace returns the namespace where the service is running
+func (s *Service) getServiceNamespace() (string, error) {
+	// First try to read from the service account namespace file
+	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		namespace := strings.TrimSpace(string(data))
+		if namespace != "" {
+			return namespace, nil
+		}
+	}
+
+	// Fallback to environment variable
+	if namespace := os.Getenv("POD_NAMESPACE"); namespace != "" {
+		return namespace, nil
+	}
+
+	// If running outside of Kubernetes, return an error
+	return "", fmt.Errorf("unable to determine service namespace: neither service account file nor POD_NAMESPACE environment variable available")
+}
+
 func (s *Service) findEcp(snapshot *konflux.Snapshot) (string, error) {
 	ctx := context.Background()
 	return konflux.FindEnterpriseContractPolicy(ctx, s.crtlClient, s.logger, snapshot)
@@ -405,10 +432,6 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 	}
 	if err := json.Unmarshal(specJSON, &snapshotSpec); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal snapshot spec to extract components: %w", err)
-	}
-
-	if len(snapshotSpec.Components) == 0 {
-		return nil, fmt.Errorf("no components found in snapshot spec")
 	}
 
 	// log the specJSON

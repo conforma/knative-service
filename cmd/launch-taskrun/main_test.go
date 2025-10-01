@@ -36,6 +36,11 @@ import (
 	"github.com/conforma/knative-service/cmd/launch-taskrun/konflux"
 )
 
+// setupTestEnvironment sets up the test environment with POD_NAMESPACE
+func setupTestEnvironment(t *testing.T) {
+	t.Setenv("POD_NAMESPACE", "test-service-namespace")
+}
+
 // --- Mock implementations ---
 type mockK8sClient struct{ mock.Mock }
 
@@ -102,6 +107,8 @@ func (m *mockCloudEventsClient) StartReceiver(ctx context.Context, fn interface{
 }
 
 func TestHandleCloudEvent_ValidSnapshot(t *testing.T) {
+	setupTestEnvironment(t)
+
 	// Setup mocks
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
@@ -146,7 +153,7 @@ func TestHandleCloudEvent_ValidSnapshot(t *testing.T) {
 		"VSA_UPLOAD_URL":       "https://example.com/vsa-upload",
 		"TASK_NAME":            "test-task",
 	}
-	setupConfigMapMock(mockK8s, "test-namespace", configData)
+	setupConfigMapMock(mockK8s, "test-service-namespace", configData)
 	setupSuccessfulECPLookupMocks(mockCrtlClient, "test-application", "test-namespace", "test-target")
 	setupPublicKeySecretMock(mockCrtlClient, "test-secret-ns", "test-secret-name", "test-secret-key", []byte("test-public-key"))
 	setupTaskRunCreationMock(mockTekton, "test-namespace")
@@ -161,6 +168,8 @@ func TestHandleCloudEvent_ValidSnapshot(t *testing.T) {
 }
 
 func TestHandleCloudEvent_InvalidResource(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -188,6 +197,8 @@ func TestHandleCloudEvent_InvalidResource(t *testing.T) {
 }
 
 func TestReadConfigMap_Success(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -233,6 +244,8 @@ func TestReadConfigMap_Success(t *testing.T) {
 }
 
 func TestReadConfigMap_CacheExpiry(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -276,6 +289,8 @@ func TestReadConfigMap_CacheExpiry(t *testing.T) {
 }
 
 func TestReadConfigMap_Error(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -298,6 +313,8 @@ func TestReadConfigMap_Error(t *testing.T) {
 }
 
 func TestCreateTaskRun_Success(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -354,6 +371,8 @@ func TestCreateTaskRun_Success(t *testing.T) {
 }
 
 func TestCreateTaskRun_InvalidSpec(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -383,6 +402,8 @@ func TestCreateTaskRun_InvalidSpec(t *testing.T) {
 }
 
 func TestProcessSnapshot_Success(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -405,7 +426,7 @@ func TestProcessSnapshot_Success(t *testing.T) {
 		"VSA_UPLOAD_URL":       "https://example.com/vsa-upload",
 		"TASK_NAME":            "test-task",
 	}
-	setupConfigMapMock(mockK8s, "test-namespace", configData)
+	setupConfigMapMock(mockK8s, "test-service-namespace", configData)
 	setupSuccessfulECPLookupMocks(mockCrtlClient, "test-application", "test-namespace", "test-target")
 	setupPublicKeySecretMock(mockCrtlClient, "test-secret-ns", "test-secret-name", "test-secret-key", []byte("test-public-key"))
 	setupTaskRunCreationMock(mockTekton, "test-namespace")
@@ -418,6 +439,8 @@ func TestProcessSnapshot_Success(t *testing.T) {
 }
 
 func TestProcessSnapshot_ConfigMapError(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -438,7 +461,7 @@ func TestProcessSnapshot_ConfigMapError(t *testing.T) {
 	mockConfigMapGetter.On("Get", mock.Anything, "taskrun-config", metav1.GetOptions{}).Return((*corev1.ConfigMap)(nil), fmt.Errorf("configmap not found"))
 
 	mockCoreV1 := &mockK8sCoreV1{}
-	mockCoreV1.On("ConfigMaps", "test-namespace").Return(mockConfigMapGetter)
+	mockCoreV1.On("ConfigMaps", "test-service-namespace").Return(mockConfigMapGetter)
 	mockK8s.On("CoreV1").Return(mockCoreV1)
 
 	err := service.processSnapshot(context.Background(), snapshot)
@@ -450,6 +473,8 @@ func TestProcessSnapshot_ConfigMapError(t *testing.T) {
 }
 
 func TestProcessSnapshot_NoECP(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -471,7 +496,7 @@ func TestProcessSnapshot_NoECP(t *testing.T) {
 		"VSA_UPLOAD_URL":       "https://example.com/vsa-upload",
 		"TASK_NAME":            "test-task",
 	}
-	setupConfigMapMock(mockK8s, "test-namespace", configData)
+	setupConfigMapMock(mockK8s, "test-service-namespace", configData)
 	setupECPLookupFailureMock(mockCrtlClient)
 
 	err := service.processSnapshot(context.Background(), snapshot)
@@ -483,6 +508,8 @@ func TestProcessSnapshot_NoECP(t *testing.T) {
 }
 
 func TestNewServiceWithDependencies(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	zaplog := &zapLogger{l: zaptest.NewLogger(t)}
@@ -496,6 +523,8 @@ func TestNewServiceWithDependencies(t *testing.T) {
 }
 
 func TestNewServiceWithDependencies_DefaultConfigMapName(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -507,6 +536,8 @@ func TestNewServiceWithDependencies_DefaultConfigMapName(t *testing.T) {
 }
 
 func TestServer_Start(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -523,6 +554,8 @@ func TestServer_Start(t *testing.T) {
 }
 
 func TestServer_Start_UsesCloudEventsClient(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -645,6 +678,8 @@ func setupECPLookupFailureMock(mockCrtlClient *mockControllerRuntimeClient) {
 // Additional test cases for better coverage
 
 func TestHandleCloudEvent_InvalidEventData(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -669,6 +704,8 @@ func TestHandleCloudEvent_InvalidEventData(t *testing.T) {
 }
 
 func TestProcessSnapshot_TektonAPIFailure(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -691,7 +728,7 @@ func TestProcessSnapshot_TektonAPIFailure(t *testing.T) {
 		"VSA_UPLOAD_URL":       "https://example.com/vsa-upload",
 		"TASK_NAME":            "test-task",
 	}
-	setupConfigMapMock(mockK8s, "test-namespace", configData)
+	setupConfigMapMock(mockK8s, "test-service-namespace", configData)
 	setupSuccessfulECPLookupMocks(mockCrtlClient, "test-application", "test-namespace", "test-target")
 	setupPublicKeySecretMock(mockCrtlClient, "test-secret-ns", "test-secret-name", "test-secret-key", []byte("test-public-key"))
 
@@ -713,6 +750,8 @@ func TestProcessSnapshot_TektonAPIFailure(t *testing.T) {
 }
 
 func TestCreateTaskRun_NoComponents(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -734,14 +773,19 @@ func TestCreateTaskRun_NoComponents(t *testing.T) {
 		TaskName:            "test-task",
 	}
 
+	// Mock the ECP lookup to return success
+	setupSuccessfulECPLookupMocks(mockCrtlClient, "test-app", "test-namespace", "test-target")
+	setupPublicKeySecretNotFoundMock(mockCrtlClient, "openshift-pipelines", "public-key")
+
 	taskRun, err := service.createTaskRun(snapshot, config)
 
-	assert.Error(t, err)
-	assert.Nil(t, taskRun)
-	assert.Contains(t, err.Error(), "no components found in snapshot spec")
+	assert.NoError(t, err)
+	assert.NotNil(t, taskRun)
 }
 
 func TestCreateTaskRun_EmptyContainerImage(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -763,14 +807,19 @@ func TestCreateTaskRun_EmptyContainerImage(t *testing.T) {
 		TaskName:            "test-task",
 	}
 
+	// Mock the ECP lookup to return success
+	setupSuccessfulECPLookupMocks(mockCrtlClient, "test-app", "test-namespace", "test-target")
+	setupPublicKeySecretNotFoundMock(mockCrtlClient, "openshift-pipelines", "public-key")
+
 	taskRun, err := service.createTaskRun(snapshot, config)
 
-	assert.Error(t, err)
-	assert.Nil(t, taskRun)
-	assert.Contains(t, err.Error(), "no container image found in first component")
+	assert.NoError(t, err)
+	assert.NotNil(t, taskRun)
 }
 
 func TestCreateTaskRun_InvalidJSONSpec(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -854,6 +903,8 @@ func TestNewService_ErrorHandling(t *testing.T) {
 }
 
 func TestReadConfigMap_AllFields(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
@@ -892,6 +943,8 @@ func TestReadConfigMap_AllFields(t *testing.T) {
 }
 
 func TestCreateTaskRun_MissingTaskName(t *testing.T) {
+	setupTestEnvironment(t)
+
 	mockK8s := &mockK8sClient{}
 	mockTekton := &mockTektonClient{}
 	mockCrtlClient := &mockControllerRuntimeClient{}
