@@ -401,12 +401,6 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 	// Use the raw JSON spec directly
 	specJSON := snapshot.Spec
 
-	// It seems unlikely we'll get invalid json but let's be defensive
-	var validationTarget interface{}
-	if err := json.Unmarshal(specJSON, &validationTarget); err != nil {
-		return nil, fmt.Errorf("failed to marshal snapshot spec: %w", err)
-	}
-
 	// Extract the primary image from the snapshot spec
 	var snapshotSpec struct {
 		Components []struct {

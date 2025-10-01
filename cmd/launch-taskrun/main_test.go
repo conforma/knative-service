@@ -379,7 +379,7 @@ func TestCreateTaskRun_InvalidSpec(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, taskRun)
-	assert.Contains(t, err.Error(), "failed to marshal snapshot spec")
+	assert.Contains(t, err.Error(), "failed to unmarshal snapshot spec to extract components")
 }
 
 func TestProcessSnapshot_Success(t *testing.T) {
@@ -796,7 +796,7 @@ func TestCreateTaskRun_InvalidJSONSpec(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, taskRun)
-	assert.Contains(t, err.Error(), "failed to marshal snapshot spec")
+	assert.Contains(t, err.Error(), "failed to unmarshal snapshot spec to extract components")
 }
 
 func TestConfigMapCache_ConcurrentAccess(t *testing.T) {
