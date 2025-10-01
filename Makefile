@@ -51,6 +51,7 @@ setup-knative: ## Install and configure a kind cluster with knative installed
 	@# Create a new one
 	kn quickstart kind
 
+# kn quickstart kind fails without this on podman machine
 .PHONY: setup-knative-rootless
 setup-knative-rootless: set-rootless-port-access setup-knative ## Configure Podman machine VM for rootless port access and create Knative cluster
 
