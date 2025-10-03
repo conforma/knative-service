@@ -23,6 +23,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -221,20 +222,12 @@ type CloudEventData struct {
 }
 
 type TaskRunConfig struct {
-	PolicyConfiguration             string `json:"POLICY_CONFIGURATION"`
-	PublicKey                       string `json:"PUBLIC_KEY"`
-	RekorHost                       string `json:"REKOR_HOST"`
-	IgnoreRekor                     string `json:"IGNORE_REKOR"`
-	Strict                          string `json:"STRICT"`
-	Info                            string `json:"INFO"`
-	TufMirror                       string `json:"TUF_MIRROR"`
-	SslCertDir                      string `json:"SSL_CERT_DIR"`
-	CaTrustConfigmapName            string `json:"CA_TRUST_CONFIGMAP_NAME"`
-	CaTrustConfigMapKey             string `json:"CA_TRUST_CONFIG_MAP_KEY"`
-	ExtraRuleData                   string `json:"EXTRA_RULE_DATA"`
-	SingleComponent                 string `json:"SINGLE_COMPONENT"`
-	SingleComponentCustomResource   string `json:"SINGLE_COMPONENT_CUSTOM_RESOURCE"`
-	SingleComponentCustomResourceNs string `json:"SINGLE_COMPONENT_CUSTOM_RESOURCE_NS"`
+	PolicyConfiguration     string `json:"POLICY_CONFIGURATION"`
+	PublicKey               string `json:"PUBLIC_KEY"`
+	IgnoreRekor             string `json:"IGNORE_REKOR"`
+	VsaSigningKeySecretName string `json:"VSA_SIGNING_KEY_SECRET_NAME"`
+	VsaUploadUrl            string `json:"VSA_UPLOAD_URL"`
+	TaskName                string `json:"TASK_NAME"`
 }
 
 type Service struct {
@@ -319,12 +312,19 @@ func (s *Service) handleCloudEvent(ctx context.Context, event cloudevents.Event)
 func (s *Service) processSnapshot(ctx context.Context, snapshot *konflux.Snapshot) error {
 	s.logger.Info("Starting to process snapshot", gozap.String("name", snapshot.Name), gozap.String("namespace", snapshot.Namespace))
 
-	config, err := s.readConfigMap(ctx, snapshot.Namespace)
+	// Read configmap from the service's own namespace, not the snapshot's namespace
+	serviceNamespace, err := s.getServiceNamespace()
+	if err != nil {
+		s.logger.Error(err, "Failed to get service namespace")
+		return fmt.Errorf("failed to get service namespace: %w", err)
+	}
+
+	config, err := s.readConfigMap(ctx, serviceNamespace)
 	if err != nil {
 		s.logger.Error(err, "Failed to read configmap")
 		return fmt.Errorf("failed to read configmap: %w", err)
 	}
-	s.logger.Info("Successfully read configmap", gozap.String("namespace", snapshot.Namespace))
+	s.logger.Info("Successfully read configmap", gozap.String("namespace", serviceNamespace))
 
 	taskRun, err := s.createTaskRun(snapshot, config)
 	if err != nil {
@@ -375,11 +375,39 @@ func (s *Service) readConfigMap(ctx context.Context, namespace string) (*TaskRun
 	if val, exists := configMap.Data["IGNORE_REKOR"]; exists {
 		config.IgnoreRekor = val
 	}
+	if val, exists := configMap.Data["VSA_SIGNING_KEY_SECRET_NAME"]; exists {
+		config.VsaSigningKeySecretName = val
+	}
+	if val, exists := configMap.Data["VSA_UPLOAD_URL"]; exists {
+		config.VsaUploadUrl = val
+	}
+	if val, exists := configMap.Data["TASK_NAME"]; exists {
+		config.TaskName = val
+	}
 
 	// Cache the fetched config
 	s.configCache.set(namespace, config)
 	s.logger.Info("Fetched and cached config for namespace", gozap.String("namespace", namespace))
 	return config, nil
+}
+
+// getServiceNamespace returns the namespace where the service is running
+func (s *Service) getServiceNamespace() (string, error) {
+	// First try to read from the service account namespace file
+	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		namespace := strings.TrimSpace(string(data))
+		if namespace != "" {
+			return namespace, nil
+		}
+	}
+
+	// Fallback to environment variable
+	if namespace := os.Getenv("POD_NAMESPACE"); namespace != "" {
+		return namespace, nil
+	}
+
+	// If running outside of Kubernetes, return an error
+	return "", fmt.Errorf("unable to determine service namespace: neither service account file nor POD_NAMESPACE environment variable available")
 }
 
 func (s *Service) findEcp(snapshot *konflux.Snapshot) (string, error) {
@@ -388,13 +416,22 @@ func (s *Service) findEcp(snapshot *konflux.Snapshot) (string, error) {
 }
 
 func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfig) (*tektonv1.TaskRun, error) {
+	// Validate required fields
+	if config.TaskName == "" {
+		return nil, fmt.Errorf("TASK_NAME is required but not set in configmap")
+	}
+
 	// Use the raw JSON spec directly
 	specJSON := snapshot.Spec
 
-	// It seems unlikely we'll get invalid json but let's be defensive
-	var validationTarget interface{}
-	if err := json.Unmarshal(specJSON, &validationTarget); err != nil {
-		return nil, fmt.Errorf("failed to marshal snapshot spec: %w", err)
+	// Extract the primary image from the snapshot spec
+	var snapshotSpec struct {
+		Components []struct {
+			ContainerImage string `json:"containerImage"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(specJSON, &snapshotSpec); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal snapshot spec to extract components: %w", err)
 	}
 
 	// log the specJSON
@@ -425,15 +462,22 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		s.logger.Info("Found RPA in cluster. Using correct ECP.")
 	}
 
+	s.logger.Info("Using VSA signing key from mounted secret.")
+
+	// Validate VSA upload URL is configured
+	if config.VsaUploadUrl == "" {
+		return nil, fmt.Errorf("VSA upload URL is not set")
+	}
+
 	params := []tektonv1.Param{
+		{Name: "IMAGES", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: string(specJSON)}},
 		{Name: "POLICY_CONFIGURATION", Value: createParamValue(ecp)},
 		{Name: "PUBLIC_KEY", Value: createParamValue(config.PublicKey)},
+		{Name: "VSA_UPLOAD_URL", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: config.VsaUploadUrl}},
 		{Name: "IGNORE_REKOR", Value: createParamValue(config.IgnoreRekor)},
-		{Name: "STRICT", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "true"}},
-		{Name: "INFO", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "true"}},
-		{Name: "show-successes", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "true"}},
+		{Name: "STRICT", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "false"}}, // Don't fail on policy violations
 		{Name: "WORKERS", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "1"}},
-		{Name: "IMAGES", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: string(specJSON)}},
+		{Name: "DEBUG", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "true"}},
 	}
 
 	// Debug logging for all parameters
@@ -441,21 +485,12 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		s.logger.Info("TaskRun param", gozap.String("name", param.Name), gozap.String("type", string(param.Value.Type)), gozap.String("value", param.Value.StringVal))
 	}
 
-	// Debug logging for resolver parameters
-	resolverParams := []tektonv1.Param{
-		{Name: "bundle", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "quay.io/conforma/tekton-task:latest"}},
-		{Name: "name", Value: tektonv1.ParamValue{Type: tektonv1.ParamTypeString, StringVal: "verify-enterprise-contract"}},
-	}
-	for _, param := range resolverParams {
-		s.logger.Info("Resolver param", gozap.String("name", param.Name), gozap.String("type", string(param.Value.Type)), gozap.String("value", param.Value.StringVal))
-	}
-
 	return &tektonv1.TaskRun{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("verify-enterprise-contract-%s-%d", snapshot.Name, time.Now().Unix()),
+			Name:      fmt.Sprintf("verify-conforma-%s-%d", snapshot.Name, time.Now().Unix()),
 			Namespace: snapshot.Namespace,
 			Labels: map[string]string{
-				"app.kubernetes.io/name":       "verify-and-create-vsa",
+				"app.kubernetes.io/name":       "verify-and-generate-vsa",
 				"app.kubernetes.io/instance":   snapshot.Name,
 				"app.kubernetes.io/component":  "conforma",
 				"app.kubernetes.io/part-of":    "konflux",
@@ -464,12 +499,20 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 		},
 		Spec: tektonv1.TaskRunSpec{
 			TaskRef: &tektonv1.TaskRef{
-				ResolverRef: tektonv1.ResolverRef{
-					Resolver: "bundles",
-					Params:   resolverParams,
+				Kind:       "Task",
+				Name:       config.TaskName,
+				APIVersion: "tekton.dev/v1",
+			},
+			Params:             params,
+			ServiceAccountName: "task-runner",
+			Workspaces: []tektonv1.WorkspaceBinding{
+				{
+					Name: "signing-key",
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: config.VsaSigningKeySecretName,
+					},
 				},
 			},
-			Params: params,
 		},
 	}, nil
 }

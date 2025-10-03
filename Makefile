@@ -51,6 +51,18 @@ setup-knative: ## Install and configure a kind cluster with knative installed
 	@# Create a new one
 	kn quickstart kind
 
+# kn quickstart kind fails without this on podman machine
+.PHONY: setup-knative-rootless
+setup-knative-rootless: set-rootless-port-access setup-knative ## Configure Podman machine VM for rootless port access and create Knative cluster
+
+.PHONY: set-rootless-port-access
+set-rootless-port-access: ## Configure Podman machine VM for rootless port access
+	@echo "Configuring Podman machine VM for rootless port access..."
+	@echo "This will allow binding to privileged ports (like port 80) in rootless mode"
+	@echo "Adding 'net.ipv4.ip_unprivileged_port_start=80' to Podman machine VM..."
+	@podman machine ssh sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80
+	@echo "✅ Podman machine VM configured for rootless port access"
+
 .PHONY: check-knative
 check-knative: ## Check if Knative is properly installed
 	@echo "Checking Knative installation..."
@@ -151,11 +163,57 @@ test-coverage: ## Run tests with coverage
 	@echo "Coverage report generated: coverage.html"
 
 .PHONY: test-local
-test-local: ## Test local deployment with a sample snapshot
-	@echo "Testing local deployment with sample snapshot..."
-	kubectl apply -f test-snapshot.yaml -n $(NAMESPACE)
-	@echo "Sample snapshot created. Check TaskRuns with:"
-	@echo "kubectl get taskruns -n $(NAMESPACE)"
+test-local: ## Test local deployment with sample data and follow TaskRun logs
+	@echo "Creating sample data resources..."
+	kubectl apply -f config/dev/sample_data/policy.yaml -n $(NAMESPACE)
+	kubectl apply -f config/dev/sample_data/releaseplan.yaml -n $(NAMESPACE)
+	kubectl apply -f config/dev/sample_data/releaseplanadmission.yaml -n $(NAMESPACE)
+	@echo "🧹 Removing existing test-snapshot if it exists..."
+	kubectl delete -f config/dev/sample_data/test-snapshot.yaml -n $(NAMESPACE) --ignore-not-found
+	@echo "📸 Creating test-snapshot to trigger TaskRun..."
+	kubectl apply -f config/dev/sample_data/test-snapshot.yaml -n $(NAMESPACE)
+	@echo "✅ Sample data resources created"
+	@echo "⏳ Waiting for TaskRun to be created..."
+	@echo "This may take a few moments for the event to be processed..."
+	@sleep 5
+	@echo "🔍 Finding the created TaskRun..."
+	@TASKRUN_NAME=$$(kubectl get taskruns -n $(NAMESPACE) -l app.kubernetes.io/managed-by=conforma-knative-service --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo ""); \
+	if [ -n "$$TASKRUN_NAME" ]; then \
+		echo "📋 Found TaskRun: $$TASKRUN_NAME"; \
+		echo "📊 TaskRun status:"; \
+		kubectl get taskrun $$TASKRUN_NAME -n $(NAMESPACE); \
+		echo ""; \
+		echo "🔍 Finding pods created by TaskRun..."; \
+		POD_NAME=$$(kubectl get pods -n $(NAMESPACE) -l tekton.dev/taskRun=$$TASKRUN_NAME -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo ""); \
+		if [ -n "$$POD_NAME" ]; then \
+			echo "📦 Found pod: $$POD_NAME"; \
+			echo "⏳ Waiting for pod to be ready..."; \
+			kubectl wait --for=condition=ready pod $$POD_NAME -n $(NAMESPACE) --timeout 300s; \
+			echo "✅ Pod is ready!"; \
+			echo "📝 Following pod logs (Ctrl+C to stop):"; \
+			kubectl logs -f $$POD_NAME -n $(NAMESPACE); \
+		else \
+			echo "❌ No pod found for TaskRun. TaskRun may have completed or failed."; \
+			echo "📊 TaskRun details:"; \
+			kubectl describe taskrun $$TASKRUN_NAME -n $(NAMESPACE); \
+		fi; \
+	else \
+		echo "❌ No TaskRun found. Check if the service is running:"; \
+		echo "kubectl get pods -n $(NAMESPACE) -l app.kubernetes.io/name=conforma-knative-service"; \
+		echo ""; \
+		echo "Check all TaskRuns:"; \
+		kubectl get taskruns -n $(NAMESPACE); \
+	fi
+
+.PHONY: cleanup-test-data
+cleanup-test-data: ## Clean up sample data resources for fresh testing
+	@echo "🧹 Cleaning up sample data resources..."
+	kubectl delete -f config/dev/sample_data/test-snapshot.yaml -n $(NAMESPACE) --ignore-not-found
+	kubectl delete -f config/dev/sample_data/releaseplanadmission.yaml -n $(NAMESPACE) --ignore-not-found
+	kubectl delete -f config/dev/sample_data/releaseplan.yaml -n $(NAMESPACE) --ignore-not-found
+	kubectl delete -f config/dev/sample_data/policy.yaml -n $(NAMESPACE) --ignore-not-found
+	@echo "✅ Sample data resources cleaned up"
+	@echo "💡 You can now run 'make test-local' again for fresh testing"
 
 # === MONITORING TARGETS ===
 .PHONY: logs

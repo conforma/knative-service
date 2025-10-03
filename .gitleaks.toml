@@ -1,0 +1,6 @@
+[allowlist]
+  description = "Project allowlist"
+
+  paths = [
+    '''config\/dev\/vsa-signing-key-secret.yaml$''',
+  ]

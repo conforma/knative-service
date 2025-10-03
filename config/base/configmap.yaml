@@ -24,3 +24,12 @@ data:
   POLICY_CONFIGURATION: "github.com/enterprise-contract/config//slsa3"
   PUBLIC_KEY: "k8s://openshift-pipelines/public-key"
   IGNORE_REKOR: "true"
+
+  # VSA signing key secret configuration
+  VSA_SIGNING_KEY_SECRET_NAME: "vsa-signing-key"
+
+  # VSA upload configuration
+  VSA_UPLOAD_URL: "rekor@https://rekor.sigstore.dev"
+
+  # Task configuration
+  TASK_NAME: "generate-vsa"
