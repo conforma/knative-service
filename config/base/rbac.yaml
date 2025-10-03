@@ -33,7 +33,7 @@ rules:
     resources: ["taskruns"]
     verbs: ["create"]
   - apiGroups: ["appstudio.redhat.com"]
-    resources: ["snapshots"]
+    resources: ["snapshots", "releaseplans", "releaseplanadmissions"]
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -47,4 +47,30 @@ subjects:
 roleRef:
   kind: Role
   name: conforma-knative-service
+  apiGroup: rbac.authorization.k8s.io
+---
+# ClusterRole for cross-namespace access to ReleasePlanAdmissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: conforma-knative-service-cluster
+rules:
+  - apiGroups: ["appstudio.redhat.com"]
+    resources: ["releaseplanadmissions", "enterprisecontractpolicies"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: conforma-knative-service-cluster
+subjects:
+  - kind: ServiceAccount
+    name: conforma-knative-service
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: conforma-knative-service-cluster
   apiGroup: rbac.authorization.k8s.io

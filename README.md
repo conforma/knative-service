@@ -46,7 +46,7 @@ The Conforma Knative Service is a CloudEvents-based service that monitors for th
 make setup-knative
 ```
 
-This creates a kind cluster named "knative" with both Knative Serving and Eventing installed.
+This creates a kind cluster named "knative" with Knative Eventing installed (Knative Serving is not required).
 
 ### 2. Deploy the Service
 
@@ -308,16 +308,18 @@ spec:
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Kubernetes    │    │ Conforma         │    │   Tekton        │
-│   API Server    │───▶│ Knative          │───▶│   Pipeline      │
-│                 │    │ Service          │    │                 │
+│   Kubernetes    │    │ Knative          │    │   Regular       │
+│   API Server    │───▶│ Eventing         │───▶│   Kubernetes    │
+│                 │    │ (ApiServerSource │    │   Service       │
+│   (Snapshots)   │    │  + Trigger)      │    │   + Deployment  │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                       ┌──────────────────┐
-                       │ Bundle Registry  │
-                       │ (quay.io/...)   │
-                       └──────────────────┘
+                              │                          │
+                              ▼                          ▼
+                       ┌──────────────────┐    ┌─────────────────┐
+                       │ CloudEvents      │    │   Tekton        │
+                       │ HTTP Delivery    │    │   TaskRuns      │
+                       │ (/events)        │    │                 │
+                       └──────────────────┘    └─────────────────┘
 ```
 
 ## Advanced Usage

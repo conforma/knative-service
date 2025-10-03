@@ -9,8 +9,7 @@ KNATIVE_VERSION ?= v1.18.2
 SERVICE_NAME := conforma-knative-service
 IMAGE_PATH := ko://github.com/conforma/knative-service/cmd/launch-taskrun
 STAGING_NAMESPACE := conforma-local
-SERVICE_SELECTOR := serving.knative.dev/service=$(SERVICE_NAME)
-CONFIG_SELECTOR := serving.knative.dev/configuration=$(SERVICE_NAME)
+SERVICE_SELECTOR := app=$(SERVICE_NAME)
 EVENT_SOURCE_SELECTOR := eventing.knative.dev/sourceName=snapshot-events
 
 # === DERIVED VARIABLES ===
@@ -30,8 +29,8 @@ license-add: ## Add license headers to source files that are missing them
 SHELL_FUNCTIONS = resolve_registry_image() { if [[ "$(KO_DOCKER_REPO)" == *":"* ]]; then echo "$(KO_DOCKER_REPO)"; else echo "$(KO_DOCKER_REPO):latest"; fi; }; \
 build_local_image() { echo "🔨 Building image locally with ko..." >&2; KO_DOCKER_REPO=ko.local ko build --local ./cmd/launch-taskrun 2>/dev/null | tail -1; }; \
 deploy_with_image() { echo "🚀 Deploying to cluster..." >&2; kustomize build config/dev/ | sed "s|$(IMAGE_PATH)|$$1|g" | kubectl apply -f -; }; \
-wait_for_deployment() { echo "⏳ Waiting for pods to be ready..." >&2; hack/wait-for-ready-pod.sh $(EVENT_SOURCE_SELECTOR) $(NAMESPACE); hack/wait-for-ready-pod.sh $(CONFIG_SELECTOR) $(NAMESPACE); }; \
-show_service_url() { echo "✅ Deployment complete!"; echo "Service URL:"; kubectl get ksvc $(SERVICE_NAME) -n $(NAMESPACE) -o jsonpath='{.status.url}' && echo; }; \
+wait_for_deployment() { echo "⏳ Waiting for pods to be ready..." >&2; hack/wait-for-ready-pod.sh $(EVENT_SOURCE_SELECTOR) $(NAMESPACE); hack/wait-for-ready-pod.sh $(SERVICE_SELECTOR) $(NAMESPACE); }; \
+show_service_url() { echo "✅ Deployment complete!"; echo "Service URL:"; kubectl get service $(SERVICE_NAME) -n $(NAMESPACE) -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].port}' && echo; }; \
 show_logs() { local namespace=$$1; local suffix=$$2; echo "Showing logs from $(SERVICE_NAME)$$suffix..."; kubectl logs -n $$namespace -l $(SERVICE_SELECTOR) --tail=100 -f; }; \
 undeploy_from_namespace() { local target_namespace=$$1; local suffix=$$2; echo "Removing $(SERVICE_NAME)$$suffix..."; if [ "$$target_namespace" = "$(STAGING_NAMESPACE)" ]; then kubectl delete namespace $$target_namespace --ignore-not-found; echo "Staging-local undeployment complete!"; else kustomize build config/dev/ | ko delete --ignore-not-found -f -; echo "Undeployment complete!"; fi; }
 
@@ -54,7 +53,7 @@ setup-knative: ## Install and configure a kind cluster with knative installed
 .PHONY: check-knative
 check-knative: ## Check if Knative is properly installed
 	@echo "Checking Knative installation..."
-	@kubectl get crd | grep -E "(serving|eventing)" || (echo "Knative CRDs not found. Run 'make setup-knative' first." && exit 1)
+	@kubectl get crd | grep "eventing" || (echo "Knative Eventing CRDs not found. Run 'make setup-knative' first." && exit 1)
 	@echo "Knative is properly installed!"
 
 # === BUILD TARGETS ===
@@ -121,7 +120,7 @@ deploy-staging-local: check-knative ## Deploy locally using infra-deployments st
 	fi
 	@echo "Staging-local deployment complete!"
 	@echo "Service URL:"
-	@kubectl get ksvc $(SERVICE_NAME) -n $(STAGING_NAMESPACE) -o jsonpath='{.status.url}' && echo
+	@kubectl get service $(SERVICE_NAME) -n $(STAGING_NAMESPACE) -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].port}' && echo
 
 .PHONY: undeploy-local
 undeploy-local: ## Remove the local deployment
@@ -173,8 +172,8 @@ status: ## Show deployment status
 	@echo "Deployment status:"
 	kubectl get all -l app=$(SERVICE_NAME) -n $(NAMESPACE)
 	@echo ""
-	@echo "Knative Service status:"
-	kubectl get ksvc $(SERVICE_NAME) -n $(NAMESPACE) || echo "Knative Service not found"
+	@echo "Service status:"
+	kubectl get service $(SERVICE_NAME) -n $(NAMESPACE) || echo "Service not found"
 	@echo ""
 	@echo "Event sources:"
 	kubectl get apiserversource -n $(NAMESPACE)
