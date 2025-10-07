@@ -463,6 +463,7 @@ func (s *Service) createTaskRun(snapshot *konflux.Snapshot, config *TaskRunConfi
 			},
 		},
 		Spec: tektonv1.TaskRunSpec{
+			ServiceAccountName: "conforma-knative-service",
 			TaskRef: &tektonv1.TaskRef{
 				ResolverRef: tektonv1.ResolverRef{
 					Resolver: "bundles",
@@ -500,9 +501,16 @@ func main() {
 		port = "8080"
 	}
 	protocol, err := cehttp.New(
-		cehttp.WithPath("/"),
+		cehttp.WithPath("/events"),
 		cehttp.WithMiddleware(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Health check endpoint
+				if r.URL.Path == "/" && r.Method == "GET" {
+					w.WriteHeader(http.StatusOK)
+					_, _ = w.Write([]byte("OK"))
+					return
+				}
+
 				if r.Header.Get("Ce-Type") != "dev.knative.apiserver.resource.add" {
 					w.WriteHeader(http.StatusAccepted)
 					return
