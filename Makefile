@@ -149,6 +149,11 @@ test-coverage: ## Run tests with coverage
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
+.PHONY: acceptance
+acceptance: ## Run acceptance tests
+	@echo "Running acceptance tests..."
+	cd acceptance && go test ./... -v
+
 .PHONY: test-local
 test-local: ## Test local deployment with a sample snapshot
 	@echo "Testing local deployment with sample snapshot..."
