@@ -18,7 +18,7 @@ module tools
 
 go 1.24.7
 
-require github.com/google/addlicense v1.1.1
+require github.com/google/addlicense v1.2.0
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.0.2 // indirect
