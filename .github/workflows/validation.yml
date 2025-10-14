@@ -54,7 +54,7 @@ jobs:
         path: |
           ~/go/pkg/mod
           ~/.cache/go-build
-        key: ${{ runner.os }}-go-${{ hashFiles('go.sum', 'tools/go.sum') }}
+        key: ${{ runner.os }}-go-${{ hashFiles('go.sum', 'tools/go.sum', 'acceptance/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
 
@@ -62,6 +62,7 @@ jobs:
       run: |
         go mod download
         go mod download -modfile tools/go.mod
+        go mod download -modfile acceptance/go.mod
 
     - name: Format check
       run: |
@@ -88,7 +89,7 @@ jobs:
       uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
       if: always()
       with:
-        file: ./coverage.out
+        files: ./coverage.out
         flags: unittests
         name: codecov-umbrella
 
@@ -131,7 +132,7 @@ jobs:
         set -euo pipefail
         echo "🔍 Running security scan..."
         go install github.com/securego/gosec/v2/cmd/gosec@${{ env.GOSEC_VERSION }}
-        gosec -fmt sarif -out gosec.sarif -stdout -verbose=text ./...
+        gosec -fmt sarif -out gosec.sarif -stdout -verbose=text -exclude-dir=acceptance ./...
         echo "✅ Security scan completed"
 
     - name: Save validation results
