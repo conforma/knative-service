@@ -14,21 +14,16 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-apiVersion: sources.knative.dev/v1
-kind: ApiServerSource
+---
+# Create a default broker in the default namespace for testing
+apiVersion: eventing.knative.dev/v1
+kind: Broker
 metadata:
-  name: snapshot-events
+  name: default
+  namespace: default
 spec:
-  serviceAccountName: conforma-knative-service
-  mode: Resource
-  # Match all namespaces by using empty matchExpressions
-  namespaceSelector:
-    matchExpressions: []
-  resources:
-    - apiVersion: appstudio.redhat.com/v1alpha1
-      kind: Snapshot
-  sink:
-    ref:
-      apiVersion: eventing.knative.dev/v1
-      kind: Broker
-      name: default
+  config:
+    apiVersion: v1
+    kind: ConfigMap
+    name: config-br-default-channel
+    namespace: knative-eventing

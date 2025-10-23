@@ -61,6 +61,10 @@ func (c ClusterState) KubeConfig(ctx context.Context) (string, error) {
 	return c.cluster.KubeConfig(ctx)
 }
 
+func (c *ClusterState) Cluster() types.Cluster {
+	return c.cluster
+}
+
 type startFunc func(context.Context) (context.Context, types.Cluster, error)
 
 // startAndSetupState starts the cluster via the provided startFunc. The
