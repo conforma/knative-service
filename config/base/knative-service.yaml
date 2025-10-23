@@ -34,6 +34,7 @@ spec:
       containers:
         - name: conforma
           image: ko://github.com/conforma/knative-service/cmd/launch-taskrun
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
               name: http

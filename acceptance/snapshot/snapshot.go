@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -36,9 +38,8 @@ const snapshotStateKey = key(0)
 
 // SnapshotState holds the state of snapshot resources
 type SnapshotState struct {
-	Snapshots     map[string]*unstructured.Unstructured
-	Namespace     string
-	InvalidExists bool // tracks if any invalid snapshots were created
+	Snapshots map[string]*unstructured.Unstructured
+	Namespace string
 }
 
 // Key implements the testenv.State interface
@@ -84,9 +85,9 @@ func createValidSnapshot(ctx context.Context, specification *godog.DocString) (c
 		s.Snapshots = make(map[string]*unstructured.Unstructured)
 	}
 
-	// Use default namespace for now
-	// In a real implementation, this would come from the cluster's working namespace
-	s.Namespace = "default"
+	// The namespace will be set when creating the snapshot in the cluster
+	// We don't know the working namespace yet at this point
+	s.Namespace = ""
 
 	// Parse the specification
 	var spec SnapshotSpec
@@ -102,8 +103,8 @@ func createValidSnapshot(ctx context.Context, specification *godog.DocString) (c
 		Spec:       spec,
 	}
 
-	// Generate unique name
-	snapshot.Metadata.Name = fmt.Sprintf("test-snapshot-%d", time.Now().Unix())
+	// Generate unique name with nanosecond precision
+	snapshot.Metadata.Name = fmt.Sprintf("test-snapshot-%d", time.Now().UnixNano())
 	snapshot.Metadata.Namespace = s.Namespace
 
 	// Convert to unstructured for Kubernetes API
@@ -117,51 +118,143 @@ func createValidSnapshot(ctx context.Context, specification *godog.DocString) (c
 	return ctx, nil
 }
 
-// createInvalidSnapshot creates an invalid snapshot from specification
-func createInvalidSnapshot(ctx context.Context, specification *godog.DocString) (context.Context, error) {
-	s := &SnapshotState{}
-	ctx, err := testenv.SetupState(ctx, &s)
+// createReleasePlanResources creates ReleasePlan and ReleasePlanAdmission resources
+// required for the Knative service to find the Enterprise Contract Policy
+func createReleasePlanResources(ctx context.Context, cluster *kubernetes.ClusterState, appName, namespace string) error {
+	clusterImpl := cluster.Cluster()
+	if clusterImpl == nil {
+		return fmt.Errorf("cluster not initialized")
+	}
+
+	dynamicClient := clusterImpl.Dynamic()
+	if dynamicClient == nil {
+		return fmt.Errorf("dynamic client not available")
+	}
+
+	mapper := clusterImpl.Mapper()
+	if mapper == nil {
+		return fmt.Errorf("REST mapper not available")
+	}
+
+	// Create ReleasePlan
+	releasePlanName := fmt.Sprintf("release-plan-%s", appName)
+	rpaName := fmt.Sprintf("rpa-%s", appName)
+
+	releasePlan := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "appstudio.redhat.com/v1alpha1",
+			"kind":       "ReleasePlan",
+			"metadata": map[string]interface{}{
+				"name":      releasePlanName,
+				"namespace": namespace,
+				"labels": map[string]interface{}{
+					"release.appstudio.openshift.io/releasePlanAdmission": rpaName,
+				},
+			},
+			"spec": map[string]interface{}{
+				"application": appName,
+				"target":      namespace, // Use the same namespace for simplicity in tests
+			},
+		},
+	}
+
+	rpGVK := schema.GroupVersionKind{
+		Group:   "appstudio.redhat.com",
+		Version: "v1alpha1",
+		Kind:    "ReleasePlan",
+	}
+	releasePlan.SetGroupVersionKind(rpGVK)
+
+	rpMapping, err := mapper.RESTMapping(rpGVK.GroupKind(), rpGVK.Version)
 	if err != nil {
-		return ctx, err
+		return fmt.Errorf("failed to get REST mapping for ReleasePlan: %w", err)
 	}
 
-	// Initialize map if not already done
-	if s.Snapshots == nil {
-		s.Snapshots = make(map[string]*unstructured.Unstructured)
-	}
-
-	// Use default namespace for now
-	// In a real implementation, this would come from the cluster's working namespace
-	s.Namespace = "default"
-
-	// Parse the specification (which should be invalid)
-	var spec SnapshotSpec
-	err = json.Unmarshal([]byte(specification.Content), &spec)
+	_, err = dynamicClient.Resource(rpMapping.Resource).Namespace(namespace).Create(ctx, releasePlan, metav1.CreateOptions{})
 	if err != nil {
-		return ctx, fmt.Errorf("failed to parse snapshot specification: %w", err)
+		// If already exists, delete and retry
+		if apierrors.IsAlreadyExists(err) {
+			deleteErr := dynamicClient.Resource(rpMapping.Resource).Namespace(namespace).Delete(ctx, releasePlanName, metav1.DeleteOptions{})
+			if deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
+				return fmt.Errorf("failed to delete existing ReleasePlan: %w", deleteErr)
+			}
+			time.Sleep(500 * time.Millisecond)
+			_, err = dynamicClient.Resource(rpMapping.Resource).Namespace(namespace).Create(ctx, releasePlan, metav1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to create ReleasePlan after deletion: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to create ReleasePlan: %w", err)
+		}
 	}
 
-	// Create the invalid snapshot resource
-	snapshot := &Snapshot{
-		APIVersion: "appstudio.redhat.com/v1alpha1",
-		Kind:       "Snapshot",
-		Spec:       spec,
+	// Create ReleasePlanAdmission
+	releasePlanAdmission := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "appstudio.redhat.com/v1alpha1",
+			"kind":       "ReleasePlanAdmission",
+			"metadata": map[string]interface{}{
+				"name":      rpaName,
+				"namespace": namespace,
+			},
+			"spec": map[string]interface{}{
+				"policy": "test-ec-policy", // Test policy name
+			},
+		},
 	}
 
-	// Generate unique name
-	snapshot.Metadata.Name = fmt.Sprintf("invalid-snapshot-%d", time.Now().Unix())
-	snapshot.Metadata.Namespace = s.Namespace
+	rpaGVK := schema.GroupVersionKind{
+		Group:   "appstudio.redhat.com",
+		Version: "v1alpha1",
+		Kind:    "ReleasePlanAdmission",
+	}
+	releasePlanAdmission.SetGroupVersionKind(rpaGVK)
 
-	// Convert to unstructured for Kubernetes API
-	unstructuredSnapshot, err := toUnstructured(snapshot)
+	rpaMapping, err := mapper.RESTMapping(rpaGVK.GroupKind(), rpaGVK.Version)
 	if err != nil {
-		return ctx, fmt.Errorf("failed to convert snapshot to unstructured: %w", err)
+		return fmt.Errorf("failed to get REST mapping for ReleasePlanAdmission: %w", err)
 	}
 
-	s.Snapshots[snapshot.Metadata.Name] = unstructuredSnapshot
-	s.InvalidExists = true // mark that an invalid snapshot exists
+	_, err = dynamicClient.Resource(rpaMapping.Resource).Namespace(namespace).Create(ctx, releasePlanAdmission, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create ReleasePlanAdmission: %w", err)
+	}
 
-	return ctx, nil
+	return nil
+}
+
+// getWorkingNamespaceFromCluster retrieves the working namespace from the cluster
+func getWorkingNamespaceFromCluster(ctx context.Context, cluster *kubernetes.ClusterState) (string, error) {
+	clusterImpl := cluster.Cluster()
+	if clusterImpl == nil {
+		return "", fmt.Errorf("cluster implementation not available")
+	}
+
+	dynamicClient := clusterImpl.Dynamic()
+	if dynamicClient == nil {
+		return "", fmt.Errorf("dynamic client not available")
+	}
+
+	// List all namespaces and find the one with knative-test- prefix
+	gvr := schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "namespaces",
+	}
+
+	namespaces, err := dynamicClient.Resource(gvr).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to list namespaces: %w", err)
+	}
+
+	for _, ns := range namespaces.Items {
+		name := ns.GetName()
+		if len(name) > 13 && name[:13] == "knative-test-" {
+			return name, nil
+		}
+	}
+
+	return "", fmt.Errorf("no working namespace found with knative-test- prefix")
 }
 
 // createSnapshotInCluster creates the snapshot resource in the cluster
@@ -173,14 +266,47 @@ func createSnapshotInCluster(ctx context.Context) (context.Context, error) {
 
 	cluster := testenv.FetchState[kubernetes.ClusterState](ctx)
 	if cluster == nil {
-		// For stub testing, proceed without actual cluster
-		// TODO: Remove when real implementation is added
-		return ctx, nil
+		return ctx, fmt.Errorf("cluster not initialized")
 	}
+
+	// Get the working namespace from the cluster
+	// This should be the test namespace like knative-test-XXXXX
+	workingNamespace, err := getWorkingNamespaceFromCluster(ctx, cluster)
+	if err != nil {
+		return ctx, fmt.Errorf("failed to get working namespace: %w", err)
+	}
+
+	// Set the namespace in snapshot state so tests can find TaskRuns in the right namespace
+	s.Namespace = workingNamespace
 
 	// Create each snapshot in the cluster
 	for name, snapshot := range s.Snapshots {
-		err := createSnapshotResource(ctx, cluster, snapshot)
+		// Set the namespace for the snapshot if not already set
+		if snapshot.GetNamespace() == "" {
+			snapshot.SetNamespace(workingNamespace)
+		}
+
+		// Extract application name from snapshot spec
+		spec, found, err := unstructured.NestedMap(snapshot.Object, "spec")
+		if err != nil || !found {
+			return ctx, fmt.Errorf("failed to get snapshot spec for %s: %w", name, err)
+		}
+
+		appName, found, err := unstructured.NestedString(spec, "application")
+		if err != nil || !found {
+			return ctx, fmt.Errorf("failed to get application name from snapshot %s: %w", name, err)
+		}
+
+		namespace := snapshot.GetNamespace()
+
+		// Create ReleasePlan and ReleasePlanAdmission before creating the snapshot
+		// This ensures the service can find the ECP when processing the snapshot
+		err = createReleasePlanResources(ctx, cluster, appName, namespace)
+		if err != nil {
+			return ctx, fmt.Errorf("failed to create ReleasePlan resources for %s: %w", name, err)
+		}
+
+		err = createSnapshotResource(ctx, cluster, snapshot)
 		if err != nil {
 			return ctx, fmt.Errorf("failed to create snapshot %s: %w", name, err)
 		}
@@ -191,8 +317,72 @@ func createSnapshotInCluster(ctx context.Context) (context.Context, error) {
 
 // createSnapshotResource creates a snapshot resource in Kubernetes
 func createSnapshotResource(ctx context.Context, cluster *kubernetes.ClusterState, snapshot *unstructured.Unstructured) error {
-	// Implementation would use dynamic client to create the snapshot resource
-	// This is a placeholder for the actual Kubernetes API call
+	// Get the cluster implementation
+	clusterImpl := cluster.Cluster()
+	if clusterImpl == nil {
+		return fmt.Errorf("cluster not initialized")
+	}
+
+	// Get the dynamic client and mapper
+	dynamicClient := clusterImpl.Dynamic()
+	if dynamicClient == nil {
+		return fmt.Errorf("dynamic client not available")
+	}
+
+	mapper := clusterImpl.Mapper()
+	if mapper == nil {
+		return fmt.Errorf("REST mapper not available")
+	}
+
+	// Define the Snapshot GVK (GroupVersionKind)
+	gvk := schema.GroupVersionKind{
+		Group:   "appstudio.redhat.com",
+		Version: "v1alpha1",
+		Kind:    "Snapshot",
+	}
+
+	// Map the GVK to a REST resource
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return fmt.Errorf("failed to get REST mapping for Snapshot: %w", err)
+	}
+
+	// Ensure the snapshot has the correct GVK set
+	snapshot.SetGroupVersionKind(gvk)
+
+	// Get the namespace from the snapshot, or use the default from cluster
+	namespace := snapshot.GetNamespace()
+	if namespace == "" {
+		return fmt.Errorf("snapshot namespace not specified")
+	}
+
+	// Get the resource interface for the namespace
+	resourceInterface := dynamicClient.Resource(mapping.Resource).Namespace(namespace)
+
+	// Create the snapshot resource
+	_, err = resourceInterface.Create(ctx, snapshot, metav1.CreateOptions{})
+	if err != nil {
+		// If the snapshot already exists, delete it and retry
+		if apierrors.IsAlreadyExists(err) {
+			// Delete the existing snapshot
+			deleteErr := resourceInterface.Delete(ctx, snapshot.GetName(), metav1.DeleteOptions{})
+			if deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
+				return fmt.Errorf("failed to delete existing snapshot %s in namespace %s: %w", snapshot.GetName(), namespace, deleteErr)
+			}
+
+			// Wait a moment for deletion to complete
+			time.Sleep(1 * time.Second)
+
+			// Retry creation
+			_, err = resourceInterface.Create(ctx, snapshot, metav1.CreateOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to create snapshot %s in namespace %s after deletion: %w", snapshot.GetName(), namespace, err)
+			}
+		} else {
+			return fmt.Errorf("failed to create snapshot %s in namespace %s: %w", snapshot.GetName(), namespace, err)
+		}
+	}
+
 	return nil
 }
 
@@ -302,57 +492,10 @@ func AddStepsTo(sc *godog.ScenarioContext) {
 	sc.Step(`^a valid snapshot with specification$`, createValidSnapshot)
 	sc.Step(`^a valid snapshot with multiple components$`, createValidSnapshot)
 	sc.Step(`^a valid snapshot$`, createSimpleValidSnapshot)
-	sc.Step(`^an invalid snapshot with specification$`, createInvalidSnapshot)
-	sc.Step(`^a snapshot in namespace "([^"]*)"$`, func(ctx context.Context, namespace string) (context.Context, error) {
-		s := &SnapshotState{}
-		ctx, err := testenv.SetupState(ctx, &s)
-		if err != nil {
-			return ctx, err
-		}
-
-		// Initialize map if not already done
-		if s.Snapshots == nil {
-			s.Snapshots = make(map[string]*unstructured.Unstructured)
-		}
-
-		s.Namespace = namespace
-
-		// Create a default valid snapshot specification for this namespace
-		spec := SnapshotSpec{
-			Application:        fmt.Sprintf("app-%s", namespace),
-			DisplayName:        fmt.Sprintf("snapshot-%s", namespace),
-			DisplayDescription: fmt.Sprintf("Test snapshot for %s", namespace),
-			Components: []Component{
-				{
-					Name:           fmt.Sprintf("component-%s", namespace),
-					ContainerImage: "quay.io/redhat-user-workloads/test/component@sha256:abc123",
-				},
-			},
-		}
-
-		snapshot := &Snapshot{
-			APIVersion: "appstudio.redhat.com/v1alpha1",
-			Kind:       "Snapshot",
-			Spec:       spec,
-		}
-
-		snapshot.Metadata.Name = fmt.Sprintf("snapshot-%s-%d", namespace, time.Now().Unix())
-		snapshot.Metadata.Namespace = namespace
-
-		unstructuredSnapshot, err := toUnstructured(snapshot)
-		if err != nil {
-			return ctx, fmt.Errorf("failed to convert snapshot to unstructured: %w", err)
-		}
-
-		s.Snapshots[snapshot.Metadata.Name] = unstructuredSnapshot
-
-		return ctx, nil
-	})
 	sc.Step(`^(\d+) snapshots are created simultaneously$`, func(ctx context.Context, count int) (context.Context, error) {
 		return createMultipleSnapshots(ctx, count)
 	})
 	sc.Step(`^the snapshot is created in the cluster$`, createSnapshotInCluster)
 	sc.Step(`^the snapshot is created$`, createSnapshotSimple)
-	sc.Step(`^both snapshots are created$`, createSnapshotInCluster)
 	sc.Step(`^all snapshots are processed$`, createSnapshotInCluster)
 }

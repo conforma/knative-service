@@ -14,21 +14,21 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-apiVersion: sources.knative.dev/v1
-kind: ApiServerSource
-metadata:
-  name: snapshot-events
-spec:
-  serviceAccountName: conforma-knative-service
-  mode: Resource
-  # Match all namespaces by using empty matchExpressions
-  namespaceSelector:
-    matchExpressions: []
-  resources:
-    - apiVersion: appstudio.redhat.com/v1alpha1
-      kind: Snapshot
-  sink:
-    ref:
-      apiVersion: eventing.knative.dev/v1
-      kind: Broker
-      name: default
+# Test overlay for config/base that replaces the real generate-vsa Task with a stub
+# The stub Task completes quickly without doing real validation
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Include base configuration
+resources:
+  - ../base
+
+# Replace the real generate-vsa Task with the stub version
+patches:
+  - path: stub-generate-vsa.yaml
+    target:
+      group: tekton.dev
+      version: v1
+      kind: Task
+      name: generate-vsa

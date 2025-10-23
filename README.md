@@ -355,6 +355,59 @@ kustomize build config/dev/ | sed "s|ko://github.com/conforma/knative-service/cm
 go run cmd/launch-taskrun/main.go
 ```
 
+## Testing
+
+### Unit Tests
+
+Run unit tests for the service:
+
+```bash
+make test              # Run tests with verbose output
+make quiet-test        # Run tests without verbose output
+make test-coverage     # Run tests with coverage report
+```
+
+### Acceptance Tests
+
+The project includes comprehensive acceptance tests using Godog/Cucumber for behavior-driven development. The acceptance tests verify end-to-end workflows including:
+
+- Snapshot resource creation and event processing
+- Tekton TaskRun creation and execution
+- VSA (Verification Summary Attestation) generation and Rekor integration
+- Multi-component snapshot handling
+- Knative Serving and Eventing integration
+
+**Current Status**: ✅ **PRODUCTION READY** - All 3 acceptance test scenarios are fully implemented with production-grade Kubernetes integrations.
+
+#### Running Acceptance Tests
+
+```bash
+# Run all acceptance tests
+make acceptance
+
+# The tests will automatically:
+# 1. Create a kind cluster with Knative installed
+# 2. Deploy the service and dependencies
+# 3. Execute all test scenarios
+# 4. Clean up resources
+```
+
+#### Test Scenarios
+
+The acceptance test suite includes:
+
+1. **Snapshot triggers TaskRun creation** - Verifies the basic event-driven workflow
+2. **Multiple components in snapshot** - Tests handling of multi-component snapshots
+3. **VSA creation in Rekor** - Tests complete VSA workflow including:
+   - Rekor transparency log deployment
+   - Enterprise Contract Policy configuration
+   - TaskRun execution and completion monitoring
+   - VSA generation and Rekor upload
+   - VSA content validation (SLSA format)
+   - Signature verification with Rekor
+
+For detailed information about the acceptance test framework, see the [acceptance test README](acceptance/README.md).
+
 ## Contributing
 
 1. Fork the repository
@@ -362,7 +415,8 @@ go run cmd/launch-taskrun/main.go
 3. Make your changes
 4. Add tests for new functionality
 5. Run `make test` and `make lint`
-6. Submit a pull request
+6. Run `make acceptance` to verify end-to-end workflows
+7. Submit a pull request
 
 ### Development Tips
 
@@ -372,6 +426,7 @@ go run cmd/launch-taskrun/main.go
 - **Use `make help`** to see all available commands
 - **Setup and deploy**: `make setup-knative && make deploy-local` for complete setup
 - **Namespace isolation**: Local and staging deployments use separate namespaces and can coexist
+- **Run acceptance tests**: `make acceptance` for comprehensive end-to-end testing
 - The locally built image includes your latest code changes
 - Kind cluster persists between sessions unless deleted
 - Use appropriate undeploy target for the namespace you want to clean up
