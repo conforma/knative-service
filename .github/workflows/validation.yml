@@ -132,7 +132,7 @@ jobs:
         set -euo pipefail
         echo "🔍 Running security scan..."
         go install github.com/securego/gosec/v2/cmd/gosec@${{ env.GOSEC_VERSION }}
-        gosec -fmt sarif -out gosec.sarif -stdout -verbose=text -exclude-dir=acceptance ./...
+        gosec -fmt sarif -out gosec.sarif -stdout -verbose=text ./...
         echo "✅ Security scan completed"
 
     - name: Save validation results
