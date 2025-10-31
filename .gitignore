@@ -100,3 +100,4 @@ logs/
 *.bak
 *.backup
 *.orig
+cmd/launch-taskrun/launch-taskrun

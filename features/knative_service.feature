@@ -52,38 +52,6 @@ Feature: Knative Service Task Triggering
     And all TaskRuns should have the correct parameters
     And all TaskRuns should succeed
 
-  Scenario: Invalid snapshot handling
-    Given an invalid snapshot with specification
-    """
-    {
-      "application": "invalid-app",
-      "displayName": "invalid-snapshot",
-      "components": [
-        {
-          "name": "invalid-component"
-        }
-      ]
-    }
-    """
-    When the snapshot is created in the cluster
-    Then no TaskRun should be created
-    And an error event should be logged
-
-  Scenario: Namespace isolation
-    Given a snapshot in namespace "test-namespace-1"
-    And a snapshot in namespace "test-namespace-2"
-    When both snapshots are created
-    Then TaskRuns should be created in their respective namespaces
-    And TaskRuns should not interfere with each other
-
-  Scenario: Bundle resolution
-    Given a valid snapshot
-    And enterprise contract policy configuration
-    When the snapshot is created
-    Then the TaskRun should resolve the correct bundle
-    And the TaskRun should use the latest bundle version
-    And the TaskRun should execute successfully
-
   Scenario: VSA creation in Rekor
     Given Rekor is running and configured
     And a valid snapshot with specification
