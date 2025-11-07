@@ -26,9 +26,11 @@ import (
 	"io"
 	"math"
 	"math/big"
+	"net/http"
 	"os"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/phayes/freeport"
 	appsv1 "k8s.io/api/apps/v1"
@@ -37,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/wait"
 	util "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -125,6 +128,7 @@ func Start(givenCtx context.Context) (ctx context.Context, kCluster types.Cluste
 
 	create.Do(func() {
 		logger.Info("Starting Kind cluster")
+		logger.Info("⏱️  Spinning up Kind cluster, this will take a few minutes...")
 
 		var configDir string
 		configDir, err = os.MkdirTemp("", "knative-service-acceptance.*")
@@ -161,9 +165,21 @@ func Start(givenCtx context.Context) (ctx context.Context, kCluster types.Cluste
 			logger.Errorf("Unable to determine a free port: %v", err)
 			return
 		} else {
-			kCluster.registryPort = int32(port)
+			// Validate port range to prevent integer overflow
+			if port < 0 || port > 65535 {
+				logger.Errorf("Invalid port range: %d", port)
+				err = fmt.Errorf("port out of valid range: %d", port)
+				return
+			}
+			kCluster.registryPort = int32(port) // #nosec G115 - port validated to be within int32 range
 		}
 
+		// Use Kubernetes v1.30.0 for better compatibility with Tekton Pipelines v0.56.0
+		// Tekton v0.56.0 (released Feb 2024) was tested with Kubernetes 1.28-1.30
+		// v1.30.0 is a stable LTS release with proven compatibility
+		nodeImage := "kindest/node:v1.30.0@sha256:047357ac0cfea04663786a612ba1eaba9702bef25227a794b52890dd8bcd692e"
+
+		logger.Info("🚀 Creating Kind cluster with Kubernetes v1.30.0...")
 		if err = kCluster.provider.Create(kCluster.name,
 			k.CreateWithV1Alpha4Config(&v1alpha4.Cluster{
 				TypeMeta: v1alpha4.TypeMeta{
@@ -172,7 +188,8 @@ func Start(givenCtx context.Context) (ctx context.Context, kCluster types.Cluste
 				},
 				Nodes: []v1alpha4.Node{
 					{
-						Role: v1alpha4.ControlPlaneRole,
+						Role:  v1alpha4.ControlPlaneRole,
+						Image: nodeImage,
 						KubeadmConfigPatches: []string{
 							clusterConfiguration,
 						},
@@ -236,9 +253,24 @@ func Start(givenCtx context.Context) (ctx context.Context, kCluster types.Cluste
 			return
 		}
 
+		// Note: We no longer wait for Tekton Pipelines to be ready here.
+		// Tekton will continue to initialize in the background while Knative installs.
+		// The actual tests will fail with clear error messages if Tekton isn't working.
+		// This approach is more robust as it doesn't block cluster setup on Tekton timing issues.
+		logger.Info("Tekton Pipelines installation initiated, will be ready asynchronously")
+
+		// Install Knative components after base configuration
+		// This is done separately to avoid kustomize remote resource merging issues
+		logger.Info("📦 Installing Knative components (Serving and Eventing)...")
+		err = installKnativeComponents(ctx, &kCluster)
+		if err != nil {
+			logger.Errorf("Unable to install Knative components: %v", err)
+			return
+		}
+
 		globalCluster = &kCluster
 
-		logger.Info("Cluster started")
+		logger.Info("✅ Cluster started and ready!")
 	})
 
 	if err != nil {
@@ -317,14 +349,85 @@ func applyConfiguration(ctx context.Context, k *kindCluster, definitions []byte)
 	return
 }
 
+// waitForSpecificDeployment waits for a specific deployment to become available
+func waitForSpecificDeployment(ctx context.Context, k *kindCluster, namespace, deploymentName string, timeout time.Duration) error {
+	logger, ctx := log.LoggerFor(ctx)
+	logger.Infof("Waiting for deployment %s/%s to be ready...", namespace, deploymentName)
+
+	// Create a context with timeout
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	// Use PollImmediate to check deployment status
+	err := wait.PollImmediate(2*time.Second, timeout, func() (bool, error) {
+		deployment, err := k.client.AppsV1().Deployments(namespace).Get(ctx, deploymentName, metav1.GetOptions{})
+		if err != nil {
+			// Deployment doesn't exist yet, keep waiting
+			return false, nil
+		}
+
+		// Check if deployment is available
+		for _, condition := range deployment.Status.Conditions {
+			if condition.Type == appsv1.DeploymentAvailable && condition.Status == v1.ConditionTrue {
+				logger.Infof("Deployment %s/%s is now available (replicas: %d/%d)",
+					namespace, deploymentName,
+					deployment.Status.ReadyReplicas, deployment.Status.Replicas)
+				return true, nil
+			}
+		}
+
+		// Log progress
+		logger.Infof("Deployment %s/%s status: replicas=%d, ready=%d, available=%d, unavailable=%d",
+			namespace, deploymentName,
+			deployment.Status.Replicas,
+			deployment.Status.ReadyReplicas,
+			deployment.Status.AvailableReplicas,
+			deployment.Status.UnavailableReplicas)
+
+		return false, nil
+	})
+
+	if err != nil {
+		select {
+		case <-timeoutCtx.Done():
+			return fmt.Errorf("deployment %s/%s not ready after %v: %w", namespace, deploymentName, timeout, err)
+		default:
+			return fmt.Errorf("error waiting for deployment %s/%s: %w", namespace, deploymentName, err)
+		}
+	}
+
+	return nil
+}
+
 // waitForAvailableDeploymentsIn makes sure that all deployments in the provided
 // namespaces are available
 func waitForAvailableDeploymentsIn(ctx context.Context, k *kindCluster, namespaces ...string) (err error) {
+	logger, ctx := log.LoggerFor(ctx)
+
 	for _, namespace := range namespaces {
+		logger.Infof("Waiting for deployments in namespace %s to be ready...", namespace)
+
+		// Create a context with timeout for this specific namespace
+		// Use 5 minutes timeout per namespace to allow sufficient time for image pulls and startup
+		nsCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+
 		watcher := cache.NewListWatchFromClient(k.client.AppsV1().RESTClient(), "deployments", namespace, fields.Everything())
 
 		a := newAvail()
-		_, err = w.UntilWithSync(ctx, watcher, &appsv1.Deployment{}, nil, (&a).allAvailable)
+		a.logger = logger
+		a.namespace = namespace
+		_, err = w.UntilWithSync(nsCtx, watcher, &appsv1.Deployment{}, nil, (&a).allAvailable)
+		if err != nil {
+			logger.Errorf("Deployments in namespace %s not ready after timeout", namespace)
+			// Log the current state of deployments for debugging
+			for name, ready := range a.available {
+				logger.Infof("  Deployment %s: ready=%v", name, ready)
+			}
+			return fmt.Errorf("deployments in namespace %s not ready: %w", namespace, err)
+		}
+
+		logger.Infof("All deployments in namespace %s are ready", namespace)
 	}
 
 	return
@@ -335,6 +438,8 @@ func waitForAvailableDeploymentsIn(ctx context.Context, k *kindCluster, namespac
 // available
 type avail struct {
 	available map[string]bool
+	logger    log.Logger
+	namespace string
 }
 
 func newAvail() avail {
@@ -354,9 +459,25 @@ func (a *avail) allAvailable(event watch.Event) (bool, error) {
 		name := deployment.GetName()
 
 		if condition.Type == appsv1.DeploymentAvailable {
-			a.available[namespace+"/"+name] = condition.Status == v1.ConditionTrue
+			wasAvailable := a.available[namespace+"/"+name]
+			isAvailable := condition.Status == v1.ConditionTrue
+			a.available[namespace+"/"+name] = isAvailable
+
+			// Log deployment status changes
+			if a.logger != nil && wasAvailable != isAvailable {
+				if isAvailable {
+					a.logger.Infof("Deployment %s/%s is now available", namespace, name)
+				} else {
+					a.logger.Infof("Deployment %s/%s is not yet available", namespace, name)
+				}
+			}
 			break
 		}
+	}
+
+	// If no deployments have been seen yet, we're not ready
+	if len(a.available) == 0 {
+		return false, nil
 	}
 
 	for _, available := range a.available {
@@ -365,6 +486,10 @@ func (a *avail) allAvailable(event watch.Event) (bool, error) {
 		}
 	}
 
+	// All deployments are available
+	if a.logger != nil {
+		a.logger.Infof("All %d deployment(s) in namespace %s are ready", len(a.available), a.namespace)
+	}
 	return true, nil
 }
 
@@ -400,10 +525,21 @@ func Destroy(ctx context.Context) {
 		}
 		logger.Log("[Destroy] Destroying global cluster")
 
-		// wait for other cluster consumers to finish
+		// wait for other cluster consumers to finish with a timeout
+		// to prevent hanging if a scenario failed to call Stop()
 		logger.Log("[Destroy] Waiting for all consumers to finish")
-		clusterGroup.Wait()
-		logger.Log("[Destroy] Last global cluster consumer finished")
+		done := make(chan struct{})
+		go func() {
+			clusterGroup.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			logger.Log("[Destroy] Last global cluster consumer finished")
+		case <-time.After(30 * time.Second):
+			logger.Warn("[Destroy] Timeout waiting for consumers to finish, proceeding anyway")
+		}
 
 		defer func() {
 			kindDir := path.Join(globalCluster.kubeconfigPath, "..")
@@ -448,4 +584,247 @@ func (k *kindCluster) CreateNamespace(ctx context.Context) (context.Context, err
 
 func (k *kindCluster) Registry(ctx context.Context) (string, error) {
 	return fmt.Sprintf("registry.image-registry.svc.cluster.local:%d", k.registryPort), nil
+}
+
+func (k *kindCluster) Dynamic() dynamic.Interface {
+	return k.dynamic
+}
+
+func (k *kindCluster) Mapper() meta.RESTMapper {
+	return k.mapper
+}
+
+func (k *kindCluster) Clientset() *kubernetes.Clientset {
+	return k.client
+}
+
+// installKnativeComponents installs Knative Serving and Eventing components
+// This is done separately from kustomization to avoid duplicate CRD issues
+func installKnativeComponents(ctx context.Context, k *kindCluster) error {
+	logger, ctx := log.LoggerFor(ctx)
+	knativeVersion := "v1.12.0"
+
+	// Helper function to download and apply YAML from URL
+	applyFromURL := func(url string) error {
+		logger.Infof("Applying %s", url)
+		resp, err := http.Get(url) // #nosec G107 - URL is controlled, pointing to official Knative releases
+		if err != nil {
+			return fmt.Errorf("failed to download %s: %w", url, err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("failed to download %s: HTTP %d", url, resp.StatusCode)
+		}
+
+		yamlData, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read %s: %w", url, err)
+		}
+
+		// Apply each document in the YAML
+		reader := util.NewYAMLReader(bufio.NewReader(bytes.NewReader(yamlData)))
+		for {
+			definition, err := reader.Read()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return fmt.Errorf("failed to read YAML document from %s: %w", url, err)
+			}
+
+			var obj unstructured.Unstructured
+			if err = yaml.Unmarshal(definition, &obj); err != nil {
+				return fmt.Errorf("failed to unmarshal YAML from %s: %w", url, err)
+			}
+
+			// Skip empty documents
+			if obj.Object == nil || len(obj.Object) == 0 {
+				continue
+			}
+
+			mapping, err := k.mapper.RESTMapping(obj.GroupVersionKind().GroupKind())
+			if err != nil {
+				return fmt.Errorf("failed to get REST mapping for %s from %s: %w", obj.GroupVersionKind(), url, err)
+			}
+
+			var c dynamic.ResourceInterface = k.dynamic.Resource(mapping.Resource)
+			if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
+				namespace := obj.GetNamespace()
+				if namespace == "" {
+					namespace = "default"
+				}
+				c = c.(dynamic.NamespaceableResourceInterface).Namespace(namespace)
+			}
+
+			_, err = c.Apply(ctx, obj.GetName(), &obj, metav1.ApplyOptions{
+				FieldManager: "kind-acceptance-test",
+				Force:        true,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to apply %s %s from %s: %w", obj.GetKind(), obj.GetName(), url, err)
+			}
+		}
+
+		return nil
+	}
+
+	// Install Knative Serving
+	logger.Info("Installing Knative Serving CRDs...")
+	if err := applyFromURL(fmt.Sprintf("https://github.com/knative/serving/releases/download/knative-%s/serving-crds.yaml", knativeVersion)); err != nil {
+		return err
+	}
+
+	// Wait a moment for the API server to register the new CRDs
+	logger.Info("Waiting for CRDs to be registered...")
+	time.Sleep(5 * time.Second)
+
+	// Refresh the REST mapper after installing CRDs so it knows about the new resource types
+	logger.Info("Refreshing REST mapper after installing Serving CRDs...")
+	if err := refreshRESTMapper(ctx, k); err != nil {
+		return fmt.Errorf("failed to refresh REST mapper: %w", err)
+	}
+
+	logger.Info("Installing Knative Serving core...")
+	if err := applyFromURL(fmt.Sprintf("https://github.com/knative/serving/releases/download/knative-%s/serving-core.yaml", knativeVersion)); err != nil {
+		return err
+	}
+
+	logger.Info("Installing Kourier networking...")
+	if err := applyFromURL(fmt.Sprintf("https://github.com/knative/net-kourier/releases/download/knative-%s/kourier.yaml", knativeVersion)); err != nil {
+		return err
+	}
+
+	// Configure Kourier as the ingress
+	logger.Info("Configuring Knative Serving to use Kourier...")
+	if err := patchConfigMapForKourier(ctx, k); err != nil {
+		return fmt.Errorf("failed to configure Kourier: %w", err)
+	}
+
+	// Install Knative Eventing
+	logger.Info("Installing Knative Eventing CRDs...")
+	if err := applyFromURL(fmt.Sprintf("https://github.com/knative/eventing/releases/download/knative-%s/eventing-crds.yaml", knativeVersion)); err != nil {
+		return err
+	}
+
+	// Wait a moment for the API server to register the new CRDs
+	logger.Info("Waiting for CRDs to be registered...")
+	time.Sleep(5 * time.Second)
+
+	// Refresh the REST mapper after installing CRDs so it knows about the new resource types
+	logger.Info("Refreshing REST mapper after installing Eventing CRDs...")
+	if err := refreshRESTMapper(ctx, k); err != nil {
+		return fmt.Errorf("failed to refresh REST mapper: %w", err)
+	}
+
+	logger.Info("Installing Knative Eventing core...")
+	if err := applyFromURL(fmt.Sprintf("https://github.com/knative/eventing/releases/download/knative-%s/eventing-core.yaml", knativeVersion)); err != nil {
+		return err
+	}
+
+	logger.Info("Installing in-memory channel...")
+	if err := applyFromURL(fmt.Sprintf("https://github.com/knative/eventing/releases/download/knative-%s/in-memory-channel.yaml", knativeVersion)); err != nil {
+		return err
+	}
+
+	logger.Info("Installing MT Channel Broker...")
+	if err := applyFromURL(fmt.Sprintf("https://github.com/knative/eventing/releases/download/knative-%s/mt-channel-broker.yaml", knativeVersion)); err != nil {
+		return err
+	}
+
+	// Wait for Knative components to be ready
+	logger.Info("⏳ Waiting for Knative Serving to be ready...")
+	if err := waitForAvailableDeploymentsIn(ctx, k, "knative-serving", "kourier-system"); err != nil {
+		return fmt.Errorf("Knative Serving not ready: %w", err)
+	}
+
+	logger.Info("⏳ Waiting for Knative Eventing to be ready...")
+	if err := waitForAvailableDeploymentsIn(ctx, k, "knative-eventing"); err != nil {
+		return fmt.Errorf("Knative Eventing not ready: %w", err)
+	}
+
+	// Now that Knative Eventing is ready, apply the default broker
+	logger.Info("Creating default broker...")
+	if err := createDefaultBroker(ctx, k); err != nil {
+		return fmt.Errorf("failed to create default broker: %w", err)
+	}
+
+	logger.Info("Knative components installed successfully")
+	return nil
+}
+
+// patchConfigMapForKourier patches the Knative Serving config-network ConfigMap to use Kourier
+func patchConfigMapForKourier(ctx context.Context, k *kindCluster) error {
+	configMap, err := k.client.CoreV1().ConfigMaps("knative-serving").Get(ctx, "config-network", metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get config-network ConfigMap: %w", err)
+	}
+
+	if configMap.Data == nil {
+		configMap.Data = make(map[string]string)
+	}
+
+	configMap.Data["ingress-class"] = "kourier.ingress.networking.knative.dev"
+
+	_, err = k.client.CoreV1().ConfigMaps("knative-serving").Update(ctx, configMap, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update config-network ConfigMap: %w", err)
+	}
+
+	return nil
+}
+
+// createDefaultBroker creates a default Broker in the default namespace
+func createDefaultBroker(ctx context.Context, k *kindCluster) error {
+	broker := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "eventing.knative.dev/v1",
+			"kind":       "Broker",
+			"metadata": map[string]interface{}{
+				"name":      "default",
+				"namespace": "default",
+			},
+			"spec": map[string]interface{}{
+				"config": map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "ConfigMap",
+					"name":       "config-br-default-channel",
+					"namespace":  "knative-eventing",
+				},
+			},
+		},
+	}
+
+	mapping, err := k.mapper.RESTMapping(broker.GroupVersionKind().GroupKind())
+	if err != nil {
+		return fmt.Errorf("failed to get REST mapping for Broker: %w", err)
+	}
+
+	_, err = k.dynamic.Resource(mapping.Resource).Namespace("default").Apply(
+		ctx,
+		"default",
+		broker,
+		metav1.ApplyOptions{
+			FieldManager: "kind-acceptance-test",
+			Force:        true,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create default broker: %w", err)
+	}
+
+	return nil
+}
+
+// refreshRESTMapper refreshes the REST mapper to pick up newly installed CRDs
+func refreshRESTMapper(ctx context.Context, k *kindCluster) error {
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(k.config)
+
+	resources, err := restmapper.GetAPIGroupResources(discoveryClient)
+	if err != nil {
+		return fmt.Errorf("failed to get API group resources: %w", err)
+	}
+
+	k.mapper = restmapper.NewDiscoveryRESTMapper(resources)
+	return nil
 }

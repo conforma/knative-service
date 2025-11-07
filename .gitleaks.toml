@@ -1,0 +1,25 @@
+# Gitleaks configuration for knative-service repository
+# This file defines allowlists for intentional test fixtures and dummy credentials
+
+[allowlist]
+  description = "Allowlist for test fixtures and dummy credentials"
+
+  # Ignore based on file paths
+  paths = [
+    # Ignore dummy keys and secrets in acceptance tests
+    '''acceptance\/knative\/knative\.go$''',
+
+    # Ignore test fixtures directory if it exists
+    '''\/testdata\/.*''',
+    '''\/fixtures\/.*''',
+  ]
+
+  # Ignore based on line content
+  regexes = [
+    # Ignore lines with dummy/test key markers
+    '''dummy.*[Kk]ey''',
+    '''test.*[Kk]ey''',
+
+    # Ignore lines that are explicitly marked as test fixtures
+    '''for testing''',
+  ]

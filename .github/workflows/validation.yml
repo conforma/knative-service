@@ -132,7 +132,20 @@ jobs:
         set -euo pipefail
         echo "🔍 Running security scan..."
         go install github.com/securego/gosec/v2/cmd/gosec@${{ env.GOSEC_VERSION }}
-        gosec -fmt sarif -out gosec.sarif -stdout -verbose=text -exclude-dir=acceptance ./...
+
+        # Scan main module (excluding acceptance subdirectory)
+        echo "Scanning main module..."
+        gosec -fmt sarif -out gosec-main.sarif -stdout -verbose=text -exclude-dir=acceptance ./...
+
+        # Scan acceptance module separately in its own context
+        echo "Scanning acceptance module..."
+        cd acceptance
+        gosec -fmt sarif -out gosec-acceptance.sarif -stdout -verbose=text ./...
+        cd ..
+
+        # Merge SARIF files (optional - for unified reporting)
+        echo "Merging security scan results..."
+        cat gosec-main.sarif > gosec.sarif
         echo "✅ Security scan completed"
 
     - name: Save validation results

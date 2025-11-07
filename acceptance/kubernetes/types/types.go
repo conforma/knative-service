@@ -18,6 +18,10 @@ package types
 
 import (
 	"context"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 )
 
 // Cluster represents a Kubernetes cluster interface for testing
@@ -27,4 +31,7 @@ type Cluster interface {
 	KubeConfig(context.Context) (string, error)
 	CreateNamespace(context.Context) (context.Context, error)
 	Registry(context.Context) (string, error)
+	Dynamic() dynamic.Interface
+	Mapper() meta.RESTMapper
+	Clientset() *kubernetes.Clientset
 }

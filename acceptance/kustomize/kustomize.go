@@ -26,14 +26,20 @@ import (
 
 var hackDir = "hack"
 
+// Render renders a kustomization from the hack directory
 func Render(dir string) ([]byte, error) {
+	return RenderPath(path.Join(hackDir, dir))
+}
+
+// RenderPath renders a kustomization from an arbitrary path
+func RenderPath(fullPath string) ([]byte, error) {
 	options := krusty.MakeDefaultOptions()
 	options.Reorder = krusty.ReorderOptionLegacy                                    // otherwise Namespace object might appear after an object that needs it
 	options.PluginConfig = types.EnabledPluginConfig(types.BploUseStaticallyLinked) // enable plugins
 	options.PluginConfig.FnpLoadingOptions.EnableExec = true                        // we allow KEP exec plugins
 
 	kustomize := krusty.MakeKustomizer(options)
-	result, err := kustomize.Run(filesys.MakeFsOnDisk(), path.Join(hackDir, dir))
+	result, err := kustomize.Run(filesys.MakeFsOnDisk(), fullPath)
 	if err != nil {
 		return nil, err
 	}
