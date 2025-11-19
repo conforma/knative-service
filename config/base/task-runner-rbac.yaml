@@ -63,6 +63,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: conforma-vsa-generator
+    namespace: default
 roleRef:
   kind: ClusterRole
   name: conforma-knative-service-cluster
