@@ -6,7 +6,7 @@ require (
 	github.com/cloudevents/sdk-go/v2 v2.16.2
 	github.com/stretchr/testify v1.11.1
 	github.com/tektoncd/pipeline v1.6.0
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 	k8s.io/api v0.34.2
 	k8s.io/apimachinery v0.34.2
 	k8s.io/client-go v0.34.2
