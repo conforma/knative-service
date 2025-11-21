@@ -21,9 +21,8 @@ metadata:
 spec:
   serviceAccountName: conforma-knative-service
   mode: Resource
-  # Match all namespaces by using empty matchExpressions
-  namespaceSelector:
-    matchExpressions: []
+  # Match all namespaces
+  namespaceSelector: {}
   resources:
     - apiVersion: appstudio.redhat.com/v1alpha1
       kind: Snapshot
