@@ -21,13 +21,14 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/conforma/knative-service/vsajob/mocks"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/conforma/knative-service/vsajob/mocks"
 )
 
 func TestCreateVSAJob(t *testing.T) {

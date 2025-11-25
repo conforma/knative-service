@@ -35,10 +35,10 @@ import (
 // configuration rather than hard-coding it.
 const defaultEcpName = "registry-standard"
 
-// ReleasePlanNotFoundError is returned when no ReleasePlan exists for a snapshot's application.
+// ErrReleasePlanNotFound is returned when no ReleasePlan exists for a snapshot's application.
 // This is not necessarily an error condition - it indicates the snapshot is not intended for
 // release and doesn't need VSA generation.
-var ReleasePlanNotFoundError = errors.New("no ReleasePlan found for snapshot")
+var ErrReleasePlanNotFound = errors.New("no ReleasePlan found for snapshot")
 
 // policyFinder discovers the appropriate EnterpriseContractPolicy for a snapshot
 // by traversing the Konflux resource hierarchy: Snapshot → ReleasePlan → ReleasePlanAdmission → Policy.
@@ -148,7 +148,7 @@ func (pf *policyFinder) findReleasePlan(ctx context.Context, appName string, ns 
 		return rp, fmt.Errorf("failed to lookup release plan in namespace %s: %w", ns, err)
 	}
 	if len(planList.Items) == 0 {
-		return rp, ReleasePlanNotFoundError
+		return rp, ErrReleasePlanNotFound
 	}
 
 	// Filter to find just the release plans for the given application
@@ -159,7 +159,7 @@ func (pf *policyFinder) findReleasePlan(ctx context.Context, appName string, ns 
 		}
 	}
 	if len(matchingPlans) == 0 {
-		return rp, ReleasePlanNotFoundError
+		return rp, ErrReleasePlanNotFound
 	}
 
 	if len(matchingPlans) > 1 {

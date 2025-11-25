@@ -241,7 +241,6 @@ func (e *executor) WithNamespace(namespace string) Executor {
 //   - Job is created in the snapshot's namespace, NOT in the executor's service namespace
 //   - Job name is auto-generated with timestamp to ensure uniqueness
 func (e *executor) CreateVSAJob(ctx context.Context, snapshot Snapshot) error {
-
 	if snapshot.Name == "" {
 		return fmt.Errorf("snapshot name is required")
 	}
@@ -265,7 +264,7 @@ func (e *executor) CreateVSAJob(ctx context.Context, snapshot Snapshot) error {
 	if err != nil {
 		// Only skip VSA generation if no ReleasePlan exists - this is expected behavior
 		// for snapshots not intended for release. All other errors should be reported.
-		if errors.Is(err, ReleasePlanNotFoundError) {
+		if errors.Is(err, ErrReleasePlanNotFound) {
 			e.logger.Info("No ReleasePlan found, skipping VSA generation", "snapshot", snapshot.Name)
 			return nil
 		}
@@ -363,7 +362,7 @@ func (e *executor) loadJobOptions(ctx context.Context, snapshot Snapshot) (*jobO
 		if err != nil {
 			return nil, fmt.Errorf("invalid BACKOFF_LIMIT value %q: %w", v, err)
 		}
-		backoffInt := int32(backoffQuantity.Value())
+		backoffInt := int32(backoffQuantity.Value()) // #nosec G115 - backoffQuantity is a small config value
 		opts.BackoffLimit = &backoffInt
 	}
 
