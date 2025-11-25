@@ -56,7 +56,7 @@ rules:
     resources: ["snapshots", "releaseplans", "releaseplanadmissions", "enterprisecontractpolicies"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
-    resources: ["secrets"]
+    resources: ["secrets", "configmaps"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["batch"]
     resources: ["jobs"]

@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/conforma/knative-service/cmd/launch-taskrun/mocks"
+	"github.com/conforma/knative-service/cmd/trigger-vsa/mocks"
 	"github.com/conforma/knative-service/vsajob"
 	"github.com/conforma/knative-service/vsajob/vsajobtest"
 )

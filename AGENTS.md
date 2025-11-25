@@ -117,7 +117,7 @@ VSA (Verification Summary Attestation) uploaded to Rekor
 ### Code Organization
 
 ```
-cmd/launch-taskrun/           # Main service entry point
+cmd/trigger-vsa/           # Main service entry point
 ├── main.go                   # HTTP server, CloudEvent handling
 ├── main_test.go              # Tests for CloudEvent handler
 ├── k8s/                      # Kubernetes client utilities
@@ -238,7 +238,7 @@ See [vsajob/policy_finder.go](vsajob/policy_finder.go) for implementation.
 
 ### Unit Tests
 
-**cmd/launch-taskrun/main_test.go:**
+**cmd/trigger-vsa/main_test.go:**
 - Tests CloudEvent handling and HTTP layer
 - Uses mockery-generated mocks (`vsajobtest.MockExecutor`, `mocks.CloudEventsClient`)
 - Uses `testr.New(t)` for test logger
@@ -256,7 +256,7 @@ go generate ./...
 
 # Mocks are generated via go:generate directives:
 # - vsajob/interface.go: Generates vsajobtest.MockExecutor
-# - cmd/launch-taskrun/main.go: Generates mocks.CloudEventsClient
+# - cmd/trigger-vsa/main.go: Generates mocks.CloudEventsClient
 # - vsajob/executor.go: Generates internal mocks.ControllerRuntimeClient
 ```
 
@@ -274,7 +274,7 @@ go generate ./...
 This project uses [ko](https://github.com/ko-build/ko) for building and deploying:
 - `ko build`: Builds Go binaries and creates container images
 - `ko apply`: Applies Kubernetes manifests with image references resolved
-- Image references use `ko://` prefix in manifests (e.g., `ko://github.com/conforma/knative-service/cmd/launch-taskrun`)
+- Image references use `ko://` prefix in manifests (e.g., `ko://github.com/conforma/knative-service/cmd/trigger-vsa`)
 
 ### Local Development with Kind
 

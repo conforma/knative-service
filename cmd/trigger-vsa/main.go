@@ -30,7 +30,7 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/klog/v2"
 
-	"github.com/conforma/knative-service/cmd/launch-taskrun/k8s"
+	"github.com/conforma/knative-service/cmd/trigger-vsa/k8s"
 	"github.com/conforma/knative-service/vsajob"
 )
 

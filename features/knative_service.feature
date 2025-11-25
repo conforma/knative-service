@@ -1,5 +1,5 @@
-Feature: Knative Service Task Triggering
-  The knative service should trigger enterprise contract verification tasks when snapshots are created
+Feature: Knative Service Job Triggering
+  The knative service should trigger enterprise contract verification jobs when snapshots are created
 
   Background:
     Given a cluster running
@@ -7,7 +7,7 @@ Feature: Knative Service Task Triggering
     Given Knative is installed and configured
     Given the knative service is deployed
 
-  Scenario: Snapshot triggers TaskRun creation
+  Scenario: Snapshot triggers Job creation
     Given a valid snapshot with specification
     """
     {
@@ -23,10 +23,9 @@ Feature: Knative Service Task Triggering
     }
     """
     When the snapshot is created in the cluster
-    Then a TaskRun should be created
-    And the TaskRun should have the correct parameters
-    And the TaskRun should reference the enterprise contract bundle
-    And the TaskRun should succeed
+    Then a Job should be created
+    And the Job should have the correct parameters
+    And the Job parameters should have correct values
 
   Scenario: Multiple components in snapshot
     Given a valid snapshot with multiple components
@@ -48,9 +47,9 @@ Feature: Knative Service Task Triggering
     }
     """
     When the snapshot is created in the cluster
-    Then a TaskRun should be created for each component
-    And all TaskRuns should have the correct parameters
-    And all TaskRuns should succeed
+    Then a Job should be created for each component
+    And all Jobs should have the correct parameters
+    And all Jobs parameters should have correct values
 
   Scenario: VSA creation in Rekor
     Given Rekor is running and configured
@@ -68,7 +67,7 @@ Feature: Knative Service Task Triggering
     }
     """
     When the snapshot is created
-    And the TaskRun completes successfully
+    And the Job completes successfully
     Then a VSA should be created in Rekor
     And the VSA should contain the verification results
     And the VSA should be properly signed

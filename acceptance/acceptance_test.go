@@ -28,11 +28,11 @@ import (
 	"github.com/cucumber/godog"
 	"github.com/gkampitakis/go-snaps/snaps"
 
+	"github.com/conforma/knative-service/acceptance/jobs"
 	"github.com/conforma/knative-service/acceptance/knative"
 	"github.com/conforma/knative-service/acceptance/kubernetes"
 	"github.com/conforma/knative-service/acceptance/log"
 	"github.com/conforma/knative-service/acceptance/snapshot"
-	"github.com/conforma/knative-service/acceptance/tekton"
 	"github.com/conforma/knative-service/acceptance/testenv"
 	"github.com/conforma/knative-service/acceptance/vsa"
 )
@@ -58,7 +58,7 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	knative.AddStepsTo(sc)
 	kubernetes.AddStepsTo(sc)
 	snapshot.AddStepsTo(sc)
-	tekton.AddStepsTo(sc)
+	jobs.AddStepsTo(sc)
 	vsa.AddStepsTo(sc)
 
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {

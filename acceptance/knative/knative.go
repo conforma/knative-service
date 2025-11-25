@@ -980,8 +980,8 @@ func buildAndPushImage(ctx context.Context) (string, error) {
 	logger.Infof("Using registry: %s", registryURL)
 
 	// Use ko to build and push the image
-	// ko://github.com/conforma/knative-service/cmd/launch-taskrun
-	importPath := "github.com/conforma/knative-service/cmd/launch-taskrun"
+	// ko://github.com/conforma/knative-service/cmd/trigger-vsa
+	importPath := "github.com/conforma/knative-service/cmd/trigger-vsa"
 
 	// Set up environment for ko
 	// KO_DOCKER_REPO should be just the registry host:port with a repository path
@@ -1042,7 +1042,7 @@ func buildAndPushImage(ctx context.Context) (string, error) {
 // replaceImageAndNamespace replaces ko:// references and sets the namespace in YAML
 func replaceImageAndNamespace(yamlData []byte, imageRef, namespace string) ([]byte, error) {
 	// Replace the ko:// image reference with the actual built image
-	koImagePattern := "ko://github.com/conforma/knative-service/cmd/launch-taskrun"
+	koImagePattern := "ko://github.com/conforma/knative-service/cmd/trigger-vsa"
 	modifiedYAML := bytes.ReplaceAll(yamlData, []byte(koImagePattern), []byte(imageRef))
 
 	// Parse each document and set the namespace

@@ -7,7 +7,7 @@ KNATIVE_VERSION ?= v1.18.2
 
 # === PROJECT CONSTANTS ===
 SERVICE_NAME := conforma-knative-service
-IMAGE_PATH := ko://github.com/conforma/knative-service/cmd/launch-taskrun
+IMAGE_PATH := ko://github.com/conforma/knative-service/cmd/trigger-vsa
 STAGING_NAMESPACE := conforma-local
 SERVICE_SELECTOR := app=$(SERVICE_NAME)
 EVENT_SOURCE_SELECTOR := eventing.knative.dev/sourceName=snapshot-events
@@ -27,7 +27,7 @@ license-add: ## Add license headers to source files that are missing them
 
 # === SHELL FUNCTIONS ===
 SHELL_FUNCTIONS = resolve_registry_image() { if [[ "$(KO_DOCKER_REPO)" == *":"* ]]; then echo "$(KO_DOCKER_REPO)"; else echo "$(KO_DOCKER_REPO):latest"; fi; }; \
-build_local_image() { echo "🔨 Building image locally with ko..." >&2; KO_DOCKER_REPO=ko.local ko build --local ./cmd/launch-taskrun 2>/dev/null | tail -1; }; \
+build_local_image() { echo "🔨 Building image locally with ko..." >&2; KO_DOCKER_REPO=ko.local ko build --local ./cmd/trigger-vsa 2>/dev/null | tail -1; }; \
 deploy_with_image() { echo "🚀 Deploying to cluster..." >&2; kustomize build config/dev/ | sed "s|$(IMAGE_PATH)|$$1|g" | kubectl apply -f -; }; \
 wait_for_deployment() { echo "⏳ Waiting for pods to be ready..." >&2; hack/wait-for-ready-pod.sh $(SERVICE_SELECTOR) $(NAMESPACE); echo "⏳ Waiting for ApiServerSource to be ready..." >&2; kubectl wait --for=condition=Ready apiserversource/snapshot-events -n $(NAMESPACE) --timeout=300s || true; }; \
 show_service_url() { echo "✅ Deployment complete!"; echo "Service URL:"; kubectl get service $(SERVICE_NAME) -n $(NAMESPACE) -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].port}' && echo; }; \
@@ -65,12 +65,12 @@ check-knative: ## Check if Knative and Tekton are properly installed and ready
 .PHONY: build
 build: ## Build the service using ko
 	@echo "Building service with ko..."
-	ko build ./cmd/launch-taskrun
+	ko build ./cmd/trigger-vsa
 
 .PHONY: build-local
 build-local: ## Build the service locally using ko (for testing)
 	@echo "Building service locally with ko..."
-	ko build --local ./cmd/launch-taskrun
+	ko build --local ./cmd/trigger-vsa
 
 # === DEPLOYMENT TARGETS ===
 
@@ -141,16 +141,16 @@ undeploy-staging-local: ## Remove the staging-local deployment
 .PHONY: test
 test: ## Run tests
 	@echo "Running tests..."
-	cd cmd/launch-taskrun && go test ./... -v
+	cd cmd/trigger-vsa && go test ./... -v
 
 .PHONY: quiet-test
 quiet-test: ## Run tests without -v
-	@cd cmd/launch-taskrun && go test ./...
+	@cd cmd/trigger-vsa && go test ./...
 
 .PHONY: test-coverage
 test-coverage: ## Run tests with coverage
 	@echo "Running tests with coverage..."
-	cd cmd/launch-taskrun && go test -v -coverprofile=coverage.out
+	cd cmd/trigger-vsa && go test -v -coverprofile=coverage.out
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 

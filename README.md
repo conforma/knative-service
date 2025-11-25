@@ -151,7 +151,7 @@ make deploy-local DEPLOY_MODE=registry KO_DOCKER_REPO=localhost:5000/myapp:dev
 
 ### Development Workflow
 
-1. **Make code changes** in `cmd/launch-taskrun/`
+1. **Make code changes** in `cmd/trigger-vsa/`
 2. **Redeploy**: `make deploy-local` (automatically optimized for your environment)
 3. **Test**: `make test-local`
 4. **View logs**: `make logs`
@@ -159,11 +159,11 @@ make deploy-local DEPLOY_MODE=registry KO_DOCKER_REPO=localhost:5000/myapp:dev
 
 ### Performance Comparison
 
-| Method | Build Time | Deploy Time | Total Time | Use Case |
-|--------|------------|-------------|------------|----------|
-| `make deploy-local` (kind) | ~30s | ~60s | ~90s | Development with local builds |
-| `make deploy-local DEPLOY_MODE=registry` | 0s | ~30-60s | ~30-60s | Testing with existing images |
-| Legacy registry build | ~60s | ~2-5min | ~3-6min | Building and pushing to registry |
+| Method                                   | Build Time | Deploy Time | Total Time | Use Case                         |
+| ---------------------------------------- | ---------- | ----------- | ---------- | -------------------------------- |
+| `make deploy-local` (kind)               | ~30s       | ~60s        | ~90s       | Development with local builds    |
+| `make deploy-local DEPLOY_MODE=registry` | 0s         | ~30-60s     | ~30-60s    | Testing with existing images     |
+| Legacy registry build                    | ~60s       | ~2-5min     | ~3-6min    | Building and pushing to registry |
 
 ## Staging-like Testing
 
@@ -187,10 +187,10 @@ make undeploy-staging-local
 
 Our deployment targets use different namespaces for isolation:
 
-| Target | Namespace | Purpose | Cleanup Method |
-|--------|-----------|---------|----------------|
-| `make deploy-local` | `default` (configurable via `NAMESPACE` env var) | Development workflow | File-based cleanup |
-| `make deploy-staging-local` | `conforma-local` (fixed) | Staging-like testing | Namespace deletion |
+| Target                      | Namespace                                        | Purpose              | Cleanup Method     |
+| --------------------------- | ------------------------------------------------ | -------------------- | ------------------ |
+| `make deploy-local`         | `default` (configurable via `NAMESPACE` env var) | Development workflow | File-based cleanup |
+| `make deploy-staging-local` | `conforma-local` (fixed)                         | Staging-like testing | Namespace deletion |
 
 **Examples:**
 ```bash
@@ -346,13 +346,13 @@ Deploy using Kustomize and ko directly:
 kustomize build config/dev/ | ko apply -f -
 
 # Using existing image (no build)
-kustomize build config/dev/ | sed "s|ko://github.com/conforma/knative-service/cmd/launch-taskrun|your-registry/conforma:latest|g" | kubectl apply -f -
+kustomize build config/dev/ | sed "s|ko://github.com/conforma/knative-service/cmd/trigger-vsa|your-registry/conforma:latest|g" | kubectl apply -f -
 ```
 
 ### Running Locally (Outside Kubernetes)
 
 ```bash
-go run cmd/launch-taskrun/main.go
+go run cmd/trigger-vsa/main.go
 ```
 
 ## Testing

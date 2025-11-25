@@ -148,7 +148,14 @@ func Start(givenCtx context.Context) (ctx context.Context, kCluster types.Cluste
 			name:     fmt.Sprintf("acceptance-%d", id.Uint64()),
 			provider: k.NewProvider(k.ProviderWithLogger(logger)),
 		}
-		kCluster.kubeconfigPath = path.Join(configDir, "kubeconfig")
+
+		// When persisting the environment, use the default kubeconfig location
+		// so the cluster is accessible via kubectl
+		if shouldPersist, ok := givenCtx.Value(testenv.PersistStubEnvironment).(bool); ok && shouldPersist {
+			kCluster.kubeconfigPath = "" // Empty path means kind will use default ~/.kube/config
+		} else {
+			kCluster.kubeconfigPath = path.Join(configDir, "kubeconfig")
+		}
 
 		defer func() {
 			if err != nil {
