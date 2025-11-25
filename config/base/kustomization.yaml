@@ -21,6 +21,5 @@ resources:
   - configmap.yaml
   - knative-service.yaml  # Knative Service (requires Knative Serving)
   - event-source.yaml
-  - trigger.yaml
   - rbac.yaml
   - task-runner-rbac.yaml
