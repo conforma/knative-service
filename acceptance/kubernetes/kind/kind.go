@@ -181,9 +181,8 @@ func Start(givenCtx context.Context) (ctx context.Context, kCluster types.Cluste
 			kCluster.registryPort = int32(port) // #nosec G115 - port validated to be within int32 range
 		}
 
-		// Use Kubernetes v1.30.0 for better compatibility with Tekton Pipelines v0.56.0
-		// Tekton v0.56.0 (released Feb 2024) was tested with Kubernetes 1.28-1.30
-		// v1.30.0 is a stable LTS release with proven compatibility
+		// Use Kubernetes v1.30.0 for compatibility with Knative components
+		// v1.30.0 is a stable LTS release with proven compatibility with Knative v1.12.0
 		nodeImage := "kindest/node:v1.30.0@sha256:047357ac0cfea04663786a612ba1eaba9702bef25227a794b52890dd8bcd692e"
 
 		logger.Info("🚀 Creating Kind cluster with Kubernetes v1.30.0...")
@@ -259,12 +258,6 @@ func Start(givenCtx context.Context) (ctx context.Context, kCluster types.Cluste
 			logger.Errorf("Unable apply cluster configuration: %v", err)
 			return
 		}
-
-		// Note: We no longer wait for Tekton Pipelines to be ready here.
-		// Tekton will continue to initialize in the background while Knative installs.
-		// The actual tests will fail with clear error messages if Tekton isn't working.
-		// This approach is more robust as it doesn't block cluster setup on Tekton timing issues.
-		logger.Info("Tekton Pipelines installation initiated, will be ready asynchronously")
 
 		// Install Knative components after base configuration
 		// This is done separately to avoid kustomize remote resource merging issues

@@ -256,10 +256,10 @@ func verifyJobParameterValues(ctx context.Context) error {
 		return fmt.Errorf("no Jobs found")
 	}
 
-	// Get the snapshot state to compare parameter values
+	// Get the snapshot state to get the namespace
 	snapshotState := testenv.FetchState[snapshot.SnapshotState](ctx)
-	if snapshotState == nil || snapshotState.Snapshots == nil || len(snapshotState.Snapshots) == 0 {
-		return fmt.Errorf("snapshot state not found or empty")
+	if snapshotState == nil {
+		return fmt.Errorf("snapshot state not found")
 	}
 
 	// Get the cluster to fetch actual snapshot from API
@@ -291,20 +291,15 @@ func verifyJobParameterValues(ctx context.Context) error {
 			}
 		}
 
-		// Find the corresponding snapshot for this job using the annotation
-		// Jobs have annotation "conforma.dev/snapshot-name" which contains the snapshot name
-		var snapshotObj *unstructured.Unstructured
-		if job.SnapshotName != "" {
-			for _, snap := range snapshotState.Snapshots {
-				if snap.GetName() == job.SnapshotName {
-					snapshotObj = snap
-					break
-				}
-			}
+		// Fetch the snapshot from the cluster API using the annotation
+		// This is more reliable than relying on in-memory state
+		if job.SnapshotName == "" {
+			return fmt.Errorf("Job %s has no snapshot name annotation", name)
 		}
 
-		if snapshotObj == nil {
-			return fmt.Errorf("no snapshot found for Job %s (expected snapshot name: %q)", name, job.SnapshotName)
+		snapshotObj, err := fetchSnapshotFromCluster(ctx, cluster, job.Namespace, job.SnapshotName)
+		if err != nil {
+			return fmt.Errorf("failed to fetch snapshot %s for Job %s: %w", job.SnapshotName, name, err)
 		}
 
 		// Get the snapshot spec
@@ -359,7 +354,6 @@ func verifyJobParameterValues(ctx context.Context) error {
 	return nil
 }
 
-
 // verifyMultipleJobs verifies that Jobs were created for multiple components
 func verifyMultipleJobs(ctx context.Context) error {
 	j := &JobsState{}
@@ -406,8 +400,6 @@ func verifyMultipleJobs(ctx context.Context) error {
 
 	return nil
 }
-
-
 
 // getNamespaceFromSnapshotState retrieves the namespace from snapshot state
 func getNamespaceFromSnapshotState(snapshotState *snapshot.SnapshotState) string {
@@ -485,6 +477,45 @@ func findJobs(ctx context.Context, cluster *kubernetes.ClusterState, namespace s
 	}
 
 	return jobs, nil
+}
+
+// fetchSnapshotFromCluster retrieves a snapshot from the Kubernetes API
+func fetchSnapshotFromCluster(ctx context.Context, cluster *kubernetes.ClusterState, namespace, name string) (*unstructured.Unstructured, error) {
+	clusterImpl := cluster.Cluster()
+	if clusterImpl == nil {
+		return nil, fmt.Errorf("cluster not initialized")
+	}
+
+	dynamicClient := clusterImpl.Dynamic()
+	if dynamicClient == nil {
+		return nil, fmt.Errorf("dynamic client not available")
+	}
+
+	mapper := clusterImpl.Mapper()
+	if mapper == nil {
+		return nil, fmt.Errorf("REST mapper not available")
+	}
+
+	// Define the Snapshot GVK
+	gvk := schema.GroupVersionKind{
+		Group:   "appstudio.redhat.com",
+		Version: "v1alpha1",
+		Kind:    "Snapshot",
+	}
+
+	// Map the GVK to a REST resource
+	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get REST mapping for Snapshot: %w", err)
+	}
+
+	// Get the snapshot
+	snapshot, err := dynamicClient.Resource(mapping.Resource).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Snapshot %s in namespace %s: %w", name, namespace, err)
+	}
+
+	return snapshot, nil
 }
 
 // parseJob extracts JobInfo from an unstructured Job object

@@ -24,12 +24,9 @@ kind: Role
 metadata:
   name: conforma-vsa-generator
 rules:
-  - apiGroups: ["tekton.dev"]
-    resources: ["taskruns"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
-  - apiGroups: ["tekton.dev"]
-    resources: ["tasks"]
-    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
@@ -53,7 +50,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ---
 # ClusterRoleBinding to reuse existing knative service ClusterRole
-# The TaskRun needs enterprisecontractpolicies and secrets access,
+# The Job needs enterprisecontractpolicies and secrets access,
 # which are already included in conforma-knative-service-cluster
 # Note: namespace will be set dynamically at deployment time
 apiVersion: rbac.authorization.k8s.io/v1

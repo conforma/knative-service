@@ -19,18 +19,13 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 # Test cluster components installed in order:
-# 1. Tekton Pipelines - for TaskRun execution
-# 2. Knative Serving - for the knative service runtime
-# 3. Knative Eventing - for event sources and triggers
-# 4. Snapshot CRD - for application snapshot resources
-# 5. Registry - for container image storage
-# 6. Default Broker - for event routing
+# 1. Knative Serving - for the knative service runtime
+# 2. Knative Eventing - for event sources and triggers
+# 3. Custom CRDs - for application resources (Snapshot, ReleasePlan, etc.)
+# 4. Registry - for container image storage
+# 5. Default Broker - for event routing
 
 resources:
-  # Tekton Pipelines v1.6.0 - Matches go.mod dependency version
-  # Uses newer image repositories with better availability
-  - https://storage.googleapis.com/tekton-releases/pipeline/previous/v1.6.0/release.yaml
-
   # NOTE: Knative Serving and Eventing are installed separately in kind.go
   # to avoid duplicate CRD issues with kustomize remote resource merging
 
@@ -42,5 +37,3 @@ resources:
 
 # NOTE: default-broker.yaml and Kourier networking configuration are applied
 # separately in kind.go after Knative Eventing and Serving are installed
-# NOTE: Stub Task is deployed with service resources in config/test to ensure
-# it's in the same namespace as the TaskRuns

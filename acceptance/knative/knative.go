@@ -85,7 +85,7 @@ func installKnative(ctx context.Context) (context.Context, error) {
 	// Get cluster state
 	cluster := testenv.FetchState[kubernetes.ClusterState](ctx)
 	if cluster == nil {
-		// For stub testing, allow nil cluster
+		// Defensive check: allow nil cluster for unit tests
 		k.servingInstalled = true
 		k.eventingInstalled = true
 		return ctx, nil
@@ -322,7 +322,7 @@ func createDefaultBroker(ctx context.Context, cluster *kubernetes.ClusterState, 
 	return nil
 }
 
-// createVSASigningKeySecret creates a dummy signing key secret for TaskRuns to use
+// createVSASigningKeySecret creates a dummy signing key secret for Jobs to use
 func createVSASigningKeySecret(ctx context.Context, cluster *kubernetes.ClusterState, namespace string) error {
 	logger, ctx := log.LoggerFor(ctx)
 	logger.Infof("Creating VSA signing key secret in namespace %s", namespace)
@@ -423,7 +423,7 @@ func deployService(ctx context.Context, cluster *kubernetes.ClusterState, namesp
 		return fmt.Errorf("failed to create default broker: %w", err)
 	}
 
-	// 5. Create VSA signing key secret for TaskRuns
+	// 5. Create VSA signing key secret for Jobs
 	logger.Info("Creating VSA signing key secret...")
 	if err := createVSASigningKeySecret(ctx, cluster, namespace); err != nil {
 		return fmt.Errorf("failed to create VSA signing key secret: %w", err)

@@ -34,12 +34,11 @@ import (
 	"github.com/conforma/knative-service/acceptance/log"
 	"github.com/conforma/knative-service/acceptance/snapshot"
 	"github.com/conforma/knative-service/acceptance/testenv"
-	"github.com/conforma/knative-service/acceptance/vsa"
 )
 
 // NOTE: flags need to be initialized with the package in order to be recognized
 // a flag that can be set by running the test with "-args -persist" command line options
-var persist = flag.Bool("persist", false, "persist the stubbed environment to facilitate debugging")
+var persist = flag.Bool("persist", false, "persist the test environment to facilitate debugging")
 
 // run acceptance tests with the persisted environment
 var restore = flag.Bool("restore", false, "restore last persisted environment")
@@ -59,7 +58,6 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	kubernetes.AddStepsTo(sc)
 	snapshot.AddStepsTo(sc)
 	jobs.AddStepsTo(sc)
-	vsa.AddStepsTo(sc)
 
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		logger, ctx := log.LoggerFor(ctx)
