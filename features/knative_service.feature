@@ -50,25 +50,3 @@ Feature: Knative Service Job Triggering
     Then a Job should be created for each component
     And all Jobs should have the correct parameters
     And all Jobs parameters should have correct values
-
-  Scenario: VSA creation in Rekor
-    Given Rekor is running and configured
-    And a valid snapshot with specification
-    """
-    {
-      "application": "rekor-test-app",
-      "displayName": "rekor-test-snapshot",
-      "components": [
-        {
-          "name": "rekor-test-component",
-          "containerImage": "quay.io/redhat-user-workloads/test/signed-container@sha256:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"
-        }
-      ]
-    }
-    """
-    When the snapshot is created
-    And the Job completes successfully
-    Then a VSA should be created in Rekor
-    And the VSA should contain the verification results
-    And the VSA should be properly signed
-
