@@ -274,13 +274,13 @@ func (e *executor) CreateVSAJob(ctx context.Context, snapshot Snapshot) error {
 	// 3. Create the Job
 	job := e.buildJob(snapshot, policyConfig, *jobOptions, *VSAGenerationOptions)
 
-	e.logger.Info("Creating Job", "name", jobOptions.JobName, "namespace", jobOptions.TargetNamespace)
+	e.logger.Info("Creating Job", "name", jobOptions.JobName, "namespace", e.namespace)
 	err = e.client.Create(ctx, job)
 	if err != nil {
-		return fmt.Errorf("failed to create job %s in namespace %s: %w", jobOptions.JobName, jobOptions.TargetNamespace, err)
+		return fmt.Errorf("failed to create job %s in namespace %s: %w", jobOptions.JobName, e.namespace, err)
 	}
 
-	e.logger.Info("Job created successfully", "name", jobOptions.JobName, "namespace", jobOptions.TargetNamespace)
+	e.logger.Info("Job created successfully", "name", jobOptions.JobName, "namespace", e.namespace)
 	return nil
 }
 
@@ -518,7 +518,7 @@ func (e *executor) buildJob(
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobOpts.JobName,
-			Namespace: jobOpts.TargetNamespace,
+			Namespace: e.namespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/name":       "vsa-generator",
 				"app.kubernetes.io/instance":   snapshot.Name,

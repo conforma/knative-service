@@ -24,7 +24,6 @@ import (
 // jobOptions contains Kubernetes Job configuration parameters.
 // These control how the VSA generation Job is created and executed.
 type jobOptions struct {
-	TargetNamespace    string // Namespace where the Job will be created (typically the snapshot's namespace)
 	JobName            string // Unique name for the Job (auto-generated with timestamp)
 	GeneratorImage     string // Container image for the Conforma CLI
 	ServiceAccountName string // Service account for Job pods (needs Secret access)
@@ -53,7 +52,6 @@ var defaultBackoffLimit = int32(2)
 // defaultJobOptions creates default Kubernetes Job configuration for a snapshot.
 //
 // Default values:
-//   - TargetNamespace: Uses the snapshot's namespace
 //   - JobName: Auto-generated as "vsa-gen-{snapshot-name}-{unix-timestamp}" for uniqueness
 //   - GeneratorImage: "quay.io/conforma/cli:latest"
 //   - ServiceAccountName: "conforma-vsa-generator"
@@ -65,7 +63,6 @@ var defaultBackoffLimit = int32(2)
 // These defaults can be overridden via ConfigMap settings.
 func defaultJobOptions(snapshot Snapshot) jobOptions {
 	return jobOptions{
-		TargetNamespace:    snapshot.Namespace,
 		JobName:            fmt.Sprintf("vsa-gen-%s-%d", snapshot.Name, time.Now().Unix()),
 		GeneratorImage:     "quay.io/conforma/cli:latest",
 		ServiceAccountName: "conforma-vsa-generator",
