@@ -1,9 +1,9 @@
 # Ko configuration for kind cluster development
 defaultPlatforms:
-- linux/amd64
-defaultBaseImage: cgr.dev/chainguard/static:latest
+  - linux/amd64
+defaultBaseImage: gcr.io/distroless/static-debian12:nonroot
 
 # For kind clusters, we build locally and load into the cluster
 builds:
-- id: ko://github.com/conforma/knative-service/cmd/launch-taskrun
-  main: ./cmd/launch-taskrun
+  - id: ko://github.com/conforma/knative-service/cmd/trigger-vsa
+    main: ./cmd/trigger-vsa

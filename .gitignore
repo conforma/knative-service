@@ -100,4 +100,4 @@ logs/
 *.bak
 *.backup
 *.orig
-cmd/launch-taskrun/launch-taskrun
+cmd/trigger-vsa/trigger-vsa

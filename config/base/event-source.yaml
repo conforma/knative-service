@@ -21,14 +21,13 @@ metadata:
 spec:
   serviceAccountName: conforma-knative-service
   mode: Resource
-  # Match all namespaces by using empty matchExpressions
-  namespaceSelector:
-    matchExpressions: []
+  # Match all namespaces
+  namespaceSelector: {}
   resources:
     - apiVersion: appstudio.redhat.com/v1alpha1
       kind: Snapshot
   sink:
     ref:
-      apiVersion: eventing.knative.dev/v1
-      kind: Broker
-      name: default
+      apiVersion: v1
+      kind: Service
+      name: conforma-knative-service

@@ -17,7 +17,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: taskrun-config
+  name: vsa-config
   namespace: default # Change as needed
 
 data:
@@ -26,4 +26,4 @@ data:
   IGNORE_REKOR: "true"
   VSA_SIGNING_KEY_SECRET_NAME: "vsa-signing-key"
   VSA_UPLOAD_URL: "rekor@https://rekor.sigstore.dev"
-  TASK_NAME: "generate-vsa"
+  DEBUG: "true"

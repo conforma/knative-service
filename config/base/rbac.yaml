@@ -29,9 +29,9 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list"]
-  - apiGroups: ["tekton.dev"]
-    resources: ["taskruns"]
-    verbs: ["create"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -56,11 +56,11 @@ rules:
     resources: ["snapshots", "releaseplans", "releaseplanadmissions", "enterprisecontractpolicies"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
-    resources: ["secrets"]
+    resources: ["secrets", "configmaps"]
     verbs: ["get", "list", "watch"]
-  - apiGroups: ["tekton.dev"]
-    resources: ["taskruns"]
-    verbs: ["create"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

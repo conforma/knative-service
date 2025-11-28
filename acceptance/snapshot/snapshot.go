@@ -276,7 +276,7 @@ func createSnapshotInCluster(ctx context.Context) (context.Context, error) {
 		return ctx, fmt.Errorf("failed to get working namespace: %w", err)
 	}
 
-	// Set the namespace in snapshot state so tests can find TaskRuns in the right namespace
+	// Set the namespace in snapshot state so tests can find Jobs in the right namespace
 	s.Namespace = workingNamespace
 
 	// Create each snapshot in the cluster

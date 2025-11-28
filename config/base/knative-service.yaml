@@ -33,7 +33,7 @@ spec:
       serviceAccountName: conforma-knative-service
       containers:
         - name: conforma
-          image: ko://github.com/conforma/knative-service/cmd/launch-taskrun
+          image: ko://github.com/conforma/knative-service/cmd/trigger-vsa
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

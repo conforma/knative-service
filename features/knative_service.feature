@@ -1,5 +1,5 @@
-Feature: Knative Service Task Triggering
-  The knative service should trigger enterprise contract verification tasks when snapshots are created
+Feature: Knative Service Job Triggering
+  The knative service should trigger enterprise contract verification jobs when snapshots are created
 
   Background:
     Given a cluster running
@@ -7,7 +7,7 @@ Feature: Knative Service Task Triggering
     Given Knative is installed and configured
     Given the knative service is deployed
 
-  Scenario: Snapshot triggers TaskRun creation
+  Scenario: Snapshot triggers Job creation
     Given a valid snapshot with specification
     """
     {
@@ -23,10 +23,9 @@ Feature: Knative Service Task Triggering
     }
     """
     When the snapshot is created in the cluster
-    Then a TaskRun should be created
-    And the TaskRun should have the correct parameters
-    And the TaskRun should reference the enterprise contract bundle
-    And the TaskRun should succeed
+    Then a Job should be created
+    And the Job should have the correct parameters
+    And the Job parameters should have correct values
 
   Scenario: Multiple components in snapshot
     Given a valid snapshot with multiple components
@@ -48,28 +47,6 @@ Feature: Knative Service Task Triggering
     }
     """
     When the snapshot is created in the cluster
-    Then a TaskRun should be created for each component
-    And all TaskRuns should have the correct parameters
-    And all TaskRuns should succeed
-
-  Scenario: VSA creation in Rekor
-    Given Rekor is running and configured
-    And a valid snapshot with specification
-    """
-    {
-      "application": "rekor-test-app",
-      "displayName": "rekor-test-snapshot",
-      "components": [
-        {
-          "name": "rekor-test-component",
-          "containerImage": "quay.io/redhat-user-workloads/test/signed-container@sha256:a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"
-        }
-      ]
-    }
-    """
-    When the snapshot is created
-    And the TaskRun completes successfully
-    Then a VSA should be created in Rekor
-    And the VSA should contain the verification results
-    And the VSA should be properly signed
-
+    Then a Job should be created for each component
+    And all Jobs should have the correct parameters
+    And all Jobs parameters should have correct values

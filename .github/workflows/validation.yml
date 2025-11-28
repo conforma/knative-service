@@ -124,7 +124,7 @@ jobs:
         go install github.com/google/ko@latest
         
         # Test build (don't push)
-        KO_DOCKER_REPO=ko.local ko build --local ./cmd/launch-taskrun
+        KO_DOCKER_REPO=ko.local ko build --local ./cmd/trigger-vsa
         echo "✅ Container builds successfully"
 
     - name: Security scan with Gosec
