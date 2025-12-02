@@ -80,7 +80,7 @@ jobs:
           --tags="$IMAGE_TAG,latest" \
           --image-label="org.opencontainers.image.revision=$COMMIT_SHA" \
           --image-label="org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
-          ./cmd/launch-taskrun
+          ./cmd/trigger-vsa
 
         echo "✅ Image pushed to ${{ env.QUAY_REPOSITORY }}:$IMAGE_TAG"
         echo "✅ Image pushed to ${{ env.QUAY_REPOSITORY }}:latest"
