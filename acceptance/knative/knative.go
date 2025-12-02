@@ -85,7 +85,7 @@ func installKnative(ctx context.Context) (context.Context, error) {
 	// Get cluster state
 	cluster := testenv.FetchState[kubernetes.ClusterState](ctx)
 	if cluster == nil {
-		// For stub testing, allow nil cluster
+		// Defensive check: allow nil cluster for unit tests
 		k.servingInstalled = true
 		k.eventingInstalled = true
 		return ctx, nil
@@ -213,116 +213,7 @@ func deployKnativeService(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-// createDefaultBroker creates a default Broker in the specified namespace for event routing
-func createDefaultBroker(ctx context.Context, cluster *kubernetes.ClusterState, namespace string) error {
-	logger, ctx := log.LoggerFor(ctx)
-	logger.Infof("Creating default Broker in namespace %s", namespace)
-
-	clusterImpl := cluster.Cluster()
-	if clusterImpl == nil {
-		return fmt.Errorf("cluster not initialized")
-	}
-
-	dynamicClient := clusterImpl.Dynamic()
-	if dynamicClient == nil {
-		return fmt.Errorf("dynamic client not available")
-	}
-
-	mapper := clusterImpl.Mapper()
-	if mapper == nil {
-		return fmt.Errorf("REST mapper not available")
-	}
-
-	// Create the Broker resource
-	broker := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "eventing.knative.dev/v1",
-			"kind":       "Broker",
-			"metadata": map[string]interface{}{
-				"name":      "default",
-				"namespace": namespace,
-			},
-			"spec": map[string]interface{}{
-				"config": map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "ConfigMap",
-					"name":       "config-br-default-channel",
-					"namespace":  "knative-eventing",
-				},
-			},
-		},
-	}
-
-	// Set the GVK
-	gvk := schema.GroupVersionKind{
-		Group:   "eventing.knative.dev",
-		Version: "v1",
-		Kind:    "Broker",
-	}
-	broker.SetGroupVersionKind(gvk)
-
-	// Map the GVK to a REST resource
-	mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-	if err != nil {
-		return fmt.Errorf("failed to get REST mapping for Broker: %w", err)
-	}
-
-	// Create the broker
-	_, err = dynamicClient.Resource(mapping.Resource).Namespace(namespace).Apply(
-		ctx,
-		"default",
-		broker,
-		metav1.ApplyOptions{
-			FieldManager: "knative-acceptance-test",
-			Force:        true,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create Broker: %w", err)
-	}
-
-	logger.Infof("Default Broker created successfully in namespace %s", namespace)
-
-	// Wait for the Broker to be ready
-	logger.Info("Waiting for Broker to be ready...")
-	err = wait.PollImmediate(2*time.Second, 2*time.Minute, func() (bool, error) {
-		brokerObj, err := dynamicClient.Resource(mapping.Resource).Namespace(namespace).Get(ctx, "default", metav1.GetOptions{})
-		if err != nil {
-			return false, nil
-		}
-
-		// Check status conditions
-		conditions, found, err := unstructured.NestedSlice(brokerObj.Object, "status", "conditions")
-		if err != nil || !found {
-			return false, nil
-		}
-
-		for _, cond := range conditions {
-			condMap, ok := cond.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			condType, _, _ := unstructured.NestedString(condMap, "type")
-			condStatus, _, _ := unstructured.NestedString(condMap, "status")
-			if condType == "Ready" && condStatus == "True" {
-				logger.Info("Broker is ready")
-				return true, nil
-			}
-		}
-
-		return false, nil
-	})
-
-	if err != nil {
-		logger.Warn("Broker may not be ready yet, continuing anyway")
-		// Don't fail if broker isn't ready immediately - the service can still be deployed
-		// and the broker may become ready shortly after
-	}
-
-	return nil
-}
-
-// createVSASigningKeySecret creates a dummy signing key secret for TaskRuns to use
+// createVSASigningKeySecret creates a dummy signing key secret for Jobs to use
 func createVSASigningKeySecret(ctx context.Context, cluster *kubernetes.ClusterState, namespace string) error {
 	logger, ctx := log.LoggerFor(ctx)
 	logger.Infof("Creating VSA signing key secret in namespace %s", namespace)
@@ -417,19 +308,13 @@ func deployService(ctx context.Context, cluster *kubernetes.ClusterState, namesp
 		return fmt.Errorf("failed to replace image reference: %w", err)
 	}
 
-	// 4. Create a default Broker in the namespace for event routing
-	logger.Info("Creating default Broker for event routing...")
-	if err := createDefaultBroker(ctx, cluster, namespace); err != nil {
-		return fmt.Errorf("failed to create default broker: %w", err)
-	}
-
-	// 5. Create VSA signing key secret for TaskRuns
+	// 4. Create VSA signing key secret for Jobs
 	logger.Info("Creating VSA signing key secret...")
 	if err := createVSASigningKeySecret(ctx, cluster, namespace); err != nil {
 		return fmt.Errorf("failed to create VSA signing key secret: %w", err)
 	}
 
-	// 6. Apply the configuration to the cluster
+	// 5. Apply the configuration to the cluster
 	logger.Info("Applying service configuration to cluster...")
 	if err := applyYAMLData(ctx, cluster, yamlData); err != nil {
 		return fmt.Errorf("failed to apply service configuration: %w", err)
@@ -980,8 +865,8 @@ func buildAndPushImage(ctx context.Context) (string, error) {
 	logger.Infof("Using registry: %s", registryURL)
 
 	// Use ko to build and push the image
-	// ko://github.com/conforma/knative-service/cmd/launch-taskrun
-	importPath := "github.com/conforma/knative-service/cmd/launch-taskrun"
+	// ko://github.com/conforma/knative-service/cmd/trigger-vsa
+	importPath := "github.com/conforma/knative-service/cmd/trigger-vsa"
 
 	// Set up environment for ko
 	// KO_DOCKER_REPO should be just the registry host:port with a repository path
@@ -1042,7 +927,7 @@ func buildAndPushImage(ctx context.Context) (string, error) {
 // replaceImageAndNamespace replaces ko:// references and sets the namespace in YAML
 func replaceImageAndNamespace(yamlData []byte, imageRef, namespace string) ([]byte, error) {
 	// Replace the ko:// image reference with the actual built image
-	koImagePattern := "ko://github.com/conforma/knative-service/cmd/launch-taskrun"
+	koImagePattern := "ko://github.com/conforma/knative-service/cmd/trigger-vsa"
 	modifiedYAML := bytes.ReplaceAll(yamlData, []byte(koImagePattern), []byte(imageRef))
 
 	// Parse each document and set the namespace
@@ -1092,19 +977,8 @@ func replaceImageAndNamespace(yamlData []byte, imageRef, namespace string) ([]by
 		if kind == "ApiServerSource" {
 			sinkRef, found, err := unstructured.NestedMap(obj.Object, "spec", "sink", "ref")
 			if err == nil && found {
-				// Only set namespace if the ref doesn't already have one
-				// Broker references need the namespace set
 				sinkRef["namespace"] = namespace
 				_ = unstructured.SetNestedField(obj.Object, sinkRef, "spec", "sink", "ref")
-			}
-		}
-
-		// For Trigger, update the subscriber reference namespace if it exists
-		if kind == "Trigger" {
-			subscriberRef, found, err := unstructured.NestedMap(obj.Object, "spec", "subscriber", "ref")
-			if err == nil && found {
-				subscriberRef["namespace"] = namespace
-				_ = unstructured.SetNestedField(obj.Object, subscriberRef, "spec", "subscriber", "ref")
 			}
 		}
 

@@ -14,18 +14,17 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-apiVersion: eventing.knative.dev/v1
-kind: Trigger
-metadata:
-  name: snapshot-trigger
-  namespace: default # Change as needed
-spec:
-  broker: default
-  filter:
-    attributes:
-      type: dev.knative.apiserver.resource.add
-  subscriber:
-    ref:
-      apiVersion: v1
-      kind: Service
-      name: conforma-knative-service
+coverage:
+  status:
+    project:
+      default:
+        target: 80%
+    patch:
+      default:
+        target: 80%
+
+ignore:
+  - "**/mocks/*.go"
+  - "**/*mock*.go"
+  - "**/*_test.go"
+  - "acceptance"

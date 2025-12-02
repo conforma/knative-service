@@ -56,7 +56,7 @@ cleanup_demo() {
     
     # Restore original ConfigMap to avoid conflicts
     echo "  Restoring original ConfigMap..."
-    kubectl patch configmap taskrun-config -n default --patch '{
+    kubectl patch configmap vsa-config -n default --patch '{
         "data": {
             "VSA_SIGNING_KEY_SECRET_NAME": "vsa-signing-key",
             "PUBLIC_KEY": "k8s://openshift-pipelines/public-key"
@@ -114,8 +114,9 @@ cleanup_demo() {
 }
 
 # Set up signal handlers for graceful cleanup
-trap cleanup_demo EXIT
-trap 'echo ""; echo "🛑 Demo interrupted - cleaning up..."; cleanup_demo; exit 1' INT TERM
+# DISABLED: Comment out to keep resources after demo for inspection
+# trap cleanup_demo EXIT
+# trap 'echo ""; echo "🛑 Demo interrupted - cleaning up..."; cleanup_demo; exit 1' INT TERM
 
 echo "🔧 Step 1: Setting up in-cluster registry..."
 # Deploy in-cluster registry
@@ -380,7 +381,7 @@ echo "  Public key secret created"
 
 # Update configmap to use appropriate keys
 echo "  Updating configmap for demo keys..."
-kubectl patch configmap taskrun-config -n default --patch '{
+kubectl patch configmap vsa-config -n default --patch '{
     "data": {
         "VSA_SIGNING_KEY_SECRET_NAME": "vsa-demo-signing-key"
     }

@@ -155,7 +155,7 @@ jobs:
           --image-label="org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}" \
           --image-label="org.opencontainers.image.title=Conforma Knative Service" \
           --image-label="org.opencontainers.image.description=Kubernetes-native event-driven service for enterprise contract verification" \
-          ./cmd/launch-taskrun
+          ./cmd/trigger-vsa
 
         echo "✅ Release image pushed to $KO_DOCKER_REPO:$VERSION"
         echo "✅ Release image pushed to $KO_DOCKER_REPO:$VERSION-$SHORT_SHA"
@@ -200,7 +200,7 @@ jobs:
         Update your kustomization to use the release image:
         \`\`\`yaml
         images:
-        - name: ko://github.com/conforma/knative-service/cmd/launch-taskrun
+        - name: ko://github.com/conforma/knative-service/cmd/trigger-vsa
           newName: ${{ env.QUAY_REPOSITORY }}
           newTag: ${{ steps.version.outputs.version }}
         \`\`\`

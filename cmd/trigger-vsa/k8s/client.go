@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/conforma/knative-service/cmd/launch-taskrun/konflux"
+	"github.com/conforma/knative-service/vsajob"
 )
 
 func NewK8sConfig() (*rest.Config, error) {
@@ -57,9 +57,9 @@ func NewControllerRuntimeClient() (client.Client, error) {
 		return nil, fmt.Errorf("failed to add core k8s types to scheme: %w", err)
 	}
 
-	// Add the custom stub Konflux types
-	if err = konflux.AddToScheme(s); err != nil {
-		return nil, fmt.Errorf("failed to add ecp types to scheme: %w", err)
+	// Add the custom Konflux types for vsajob library
+	if err = vsajob.AddToScheme(s); err != nil {
+		return nil, fmt.Errorf("failed to add vsajob types to scheme: %w", err)
 	}
 
 	cli, err := client.New(k8sConfig, client.Options{Scheme: s})
