@@ -2,7 +2,7 @@ module github.com/conforma/knative-service/acceptance
 
 go 1.24.7
 
-toolchain go1.24.10
+toolchain go1.24.11
 
 require (
 	github.com/cucumber/godog v0.14.1
