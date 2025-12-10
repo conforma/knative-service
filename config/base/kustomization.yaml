@@ -19,8 +19,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - configmap.yaml
+  - config-map.yaml
   - knative-service.yaml  # Knative Service (requires Knative Serving)
   - event-source.yaml
   - rbac.yaml
-  - task-runner-rbac.yaml
