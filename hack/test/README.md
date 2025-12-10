@@ -23,24 +23,17 @@ The kustomization installs the following components:
 ### 3. Knative Eventing (v1.12.0)
 - Core eventing components for event-driven architecture
 - In-Memory Channel for simple event routing
-- MT (Multi-Tenant) Channel Broker for event distribution
 - Sources:
   - https://github.com/knative/eventing/releases/download/knative-v1.12.0/eventing-crds.yaml
   - https://github.com/knative/eventing/releases/download/knative-v1.12.0/eventing-core.yaml
   - https://github.com/knative/eventing/releases/download/knative-v1.12.0/in-memory-channel.yaml
-  - https://github.com/knative/eventing/releases/download/knative-v1.12.0/mt-channel-broker.yaml
 
 ### 4. Snapshot CRD (appstudio.redhat.com/v1alpha1)
 - Custom Resource Definition for Snapshot resources
 - Defines the schema for application snapshots
 - Includes component specifications with container images
 
-### 5. Default Broker
-- Creates a default Broker in the default namespace
-- Uses the MT Channel Broker implementation
-- Required for event routing in tests
-
-### 6. Image Registry
+### 5. Image Registry
 - In-cluster container registry for test images
 - Configured via `../registry` kustomization
 - Uses a generator plugin for dynamic port allocation
@@ -77,9 +70,6 @@ kubectl get pods -n knative-eventing
 
 # Snapshot CRD
 kubectl get crds snapshots.appstudio.redhat.com
-
-# Default Broker
-kubectl get broker -n default
 ```
 
 ### Test a Snapshot
@@ -119,7 +109,6 @@ EOF
          │                      ▼
          │             ┌─────────────────┐
          │             │  ApiServerSource│
-         │             │  + Trigger      │
          │             └─────────────────┘
          ▼                      │
 ┌─────────────────┐             ▼
@@ -147,23 +136,6 @@ patches:
         value: kourier.ingress.networking.knative.dev
 ```
 
-### Default Broker
-
-The default broker is configured to use the MT Channel Broker with in-memory channels:
-
-```yaml
-apiVersion: eventing.knative.dev/v1
-kind: Broker
-metadata:
-  name: default
-  namespace: default
-spec:
-  config:
-    apiVersion: v1
-    kind: ConfigMap
-    name: config-br-default-channel
-    namespace: knative-eventing
-```
 
 ## Versions
 
@@ -203,15 +175,6 @@ kubectl get crd snapshots.appstudio.redhat.com
 kubectl describe crd snapshots.appstudio.redhat.com
 ```
 
-### Event Routing Issues
-
-Check broker and trigger status:
-
-```bash
-kubectl get broker -n default
-kubectl get trigger -n default
-kubectl describe trigger <trigger-name> -n default
-```
 
 ## Development
 

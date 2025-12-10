@@ -727,10 +727,6 @@ func installKnativeComponents(ctx context.Context, k *kindCluster) error {
 		return err
 	}
 
-	logger.Info("Installing MT Channel Broker...")
-	if err := applyFromURL(fmt.Sprintf("https://github.com/knative/eventing/releases/download/knative-%s/mt-channel-broker.yaml", knativeVersion)); err != nil {
-		return err
-	}
 
 	// Wait for Knative components to be ready
 	logger.Info("⏳ Waiting for Knative Serving to be ready...")
@@ -741,12 +737,6 @@ func installKnativeComponents(ctx context.Context, k *kindCluster) error {
 	logger.Info("⏳ Waiting for Knative Eventing to be ready...")
 	if err := waitForAvailableDeploymentsIn(ctx, k, "knative-eventing"); err != nil {
 		return fmt.Errorf("Knative Eventing not ready: %w", err)
-	}
-
-	// Now that Knative Eventing is ready, apply the default broker
-	logger.Info("Creating default broker...")
-	if err := createDefaultBroker(ctx, k); err != nil {
-		return fmt.Errorf("failed to create default broker: %w", err)
 	}
 
 	logger.Info("Knative components installed successfully")
@@ -774,47 +764,6 @@ func patchConfigMapForKourier(ctx context.Context, k *kindCluster) error {
 	return nil
 }
 
-// createDefaultBroker creates a default Broker in the default namespace
-func createDefaultBroker(ctx context.Context, k *kindCluster) error {
-	broker := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "eventing.knative.dev/v1",
-			"kind":       "Broker",
-			"metadata": map[string]interface{}{
-				"name":      "default",
-				"namespace": "default",
-			},
-			"spec": map[string]interface{}{
-				"config": map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "ConfigMap",
-					"name":       "config-br-default-channel",
-					"namespace":  "knative-eventing",
-				},
-			},
-		},
-	}
-
-	mapping, err := k.mapper.RESTMapping(broker.GroupVersionKind().GroupKind())
-	if err != nil {
-		return fmt.Errorf("failed to get REST mapping for Broker: %w", err)
-	}
-
-	_, err = k.dynamic.Resource(mapping.Resource).Namespace("default").Apply(
-		ctx,
-		"default",
-		broker,
-		metav1.ApplyOptions{
-			FieldManager: "kind-acceptance-test",
-			Force:        true,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create default broker: %w", err)
-	}
-
-	return nil
-}
 
 // refreshRESTMapper refreshes the REST mapper to pick up newly installed CRDs
 func refreshRESTMapper(ctx context.Context, k *kindCluster) error {

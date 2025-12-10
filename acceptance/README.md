@@ -199,7 +199,7 @@ All components have complete, production-ready implementations with comprehensiv
 **Full Implementation**:
 - **Real Knative Serving installation**: Downloads and applies official Knative v1.12.0 CRDs and components from GitHub releases
 - **Kourier networking**: Configures ingress with Kourier as the networking layer
-- **Real Knative Eventing installation**: Downloads and applies Eventing CRDs, core components, in-memory channels, and MT Channel Broker
+- **Real Knative Eventing installation**: Downloads and applies Eventing CRDs, core components, and in-memory channels
 - **Production-grade verification**: Waits for all deployments to be ready with proper timeout handling (5 minutes)
 - **ConfigMap patching**: Real Kubernetes API operations to configure networking
 
