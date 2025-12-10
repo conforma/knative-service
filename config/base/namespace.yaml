@@ -14,13 +14,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-
-resources:
-  - namespace.yaml
-  - configmap.yaml
-  - knative-service.yaml  # Knative Service (requires Knative Serving)
-  - event-source.yaml
-  - rbac.yaml
-  - task-runner-rbac.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: conforma
+  labels:
+    app.kubernetes.io/name: conforma
+    app.kubernetes.io/part-of: conforma
