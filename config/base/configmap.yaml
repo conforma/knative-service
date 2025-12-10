@@ -18,7 +18,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: vsa-config
-  namespace: default # Change as needed
+  namespace: conforma
 
 data:
   POLICY_CONFIGURATION: "github.com/conforma/config//slsa3"

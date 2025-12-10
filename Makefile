@@ -1,6 +1,6 @@
 # === CONFIGURATION VARIABLES ===
 KUBECONFIG ?= $(HOME)/.kube/config
-NAMESPACE ?= default
+NAMESPACE ?= conforma
 KO_DOCKER_REPO ?= ko.local
 DEPLOY_MODE ?= auto
 KNATIVE_VERSION ?= v1.18.2

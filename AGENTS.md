@@ -285,7 +285,7 @@ The Makefile automatically optimizes for kind clusters:
 
 ### Namespace Isolation
 
-- **Default deployment**: Uses `default` namespace (or `NAMESPACE` env var)
+- **Default deployment**: Uses `conforma` namespace (or `NAMESPACE` env var)
 - **Staging deployment**: Uses `conforma-local` namespace (fixed)
 - Local and staging deployments can coexist without conflicts
 
