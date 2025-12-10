@@ -140,7 +140,7 @@ type executor struct {
 //   - logger: A logr.Logger instance for structured logging
 //
 // Returns an Executor with default configuration:
-//   - Namespace: "default"
+//   - Namespace: "conforma"
 //   - ConfigMap name: "vsa-config"
 //
 // Use WithNamespace() and WithConfigMapName() to customize these defaults.
@@ -173,7 +173,7 @@ func NewExecutor(
 		logger:        logger,
 		policyFinder:  newPolicyFinder(client, logger),
 		configMapName: "vsa-config",
-		namespace:     "default",
+		namespace:     "conforma",
 	}
 }
 
@@ -199,7 +199,7 @@ func (e *executor) WithConfigMapName(configMapName string) Executor {
 // This is NOT the namespace where Jobs will be created - Jobs are created in the
 // snapshot's namespace.
 //
-// Default: "default"
+// Default: "conforma"
 //
 // Tip: Use os.Getenv("POD_NAMESPACE") or the Kubernetes downward API to automatically
 // detect the service's namespace in production environments.

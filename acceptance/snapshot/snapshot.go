@@ -401,7 +401,7 @@ func createMultipleSnapshots(ctx context.Context, count int) (context.Context, e
 
 	// Use default namespace for now
 	// In a real implementation, this would come from the cluster's working namespace
-	s.Namespace = "default"
+	s.Namespace = "conforma"
 
 	// Create multiple snapshots
 	for i := 0; i < count; i++ {

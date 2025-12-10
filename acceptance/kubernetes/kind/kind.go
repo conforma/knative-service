@@ -652,7 +652,7 @@ func installKnativeComponents(ctx context.Context, k *kindCluster) error {
 			if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
 				namespace := obj.GetNamespace()
 				if namespace == "" {
-					namespace = "default"
+					namespace = "conforma"
 				}
 				c = c.(dynamic.NamespaceableResourceInterface).Namespace(namespace)
 			}
@@ -727,7 +727,6 @@ func installKnativeComponents(ctx context.Context, k *kindCluster) error {
 		return err
 	}
 
-
 	// Wait for Knative components to be ready
 	logger.Info("⏳ Waiting for Knative Serving to be ready...")
 	if err := waitForAvailableDeploymentsIn(ctx, k, "knative-serving", "kourier-system"); err != nil {
@@ -763,7 +762,6 @@ func patchConfigMapForKourier(ctx context.Context, k *kindCluster) error {
 
 	return nil
 }
-
 
 // refreshRESTMapper refreshes the REST mapper to pick up newly installed CRDs
 func refreshRESTMapper(ctx context.Context, k *kindCluster) error {

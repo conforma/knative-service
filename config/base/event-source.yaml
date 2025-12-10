@@ -18,6 +18,7 @@ apiVersion: sources.knative.dev/v1
 kind: ApiServerSource
 metadata:
   name: snapshot-events
+  namespace: conforma
 spec:
   serviceAccountName: conforma-knative-service
   mode: Resource

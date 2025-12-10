@@ -102,7 +102,7 @@ type Executor interface {
 	// It is NOT the namespace where Jobs are created - Jobs are always created in the
 	// snapshot's namespace.
 	//
-	// Default: "default"
+	// Default: "conforma"
 	//
 	// Tip: Use os.Getenv("POD_NAMESPACE") or the Kubernetes downward API to automatically
 	// detect the namespace in containerized environments.

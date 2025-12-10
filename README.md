@@ -57,13 +57,13 @@ make deploy-local
 This will automatically:
 - Build the Go application locally using `ko`
 - Load the image into the kind cluster (for kind) or use existing registry images (for other clusters)
-- Deploy all Kubernetes resources to the `default` namespace
+- Deploy all Kubernetes resources to the `conforma` namespace
 - Wait for pods to be ready
 - Display the service URL
 
 **Expected Duration:** ~1-2 minutes for kind clusters
 
-**Note**: This deploys to the `default` namespace. For staging-like testing in an isolated namespace, use `make deploy-staging-local` instead.
+**Note**: This deploys to the `conforma` namespace by default (configurable via `NAMESPACE` env var). For staging-like testing in an isolated namespace, use `make deploy-staging-local` instead.
 
 ### 3. Test the Service
 
@@ -82,7 +82,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: taskrun-config
-  namespace: default
+  namespace: conforma
 data:
   POLICY_CONFIGURATION: "github.com/conforma/config//slsa3"
   PUBLIC_KEY: |
@@ -189,12 +189,12 @@ Our deployment targets use different namespaces for isolation:
 
 | Target                      | Namespace                                        | Purpose              | Cleanup Method     |
 | --------------------------- | ------------------------------------------------ | -------------------- | ------------------ |
-| `make deploy-local`         | `default` (configurable via `NAMESPACE` env var) | Development workflow | File-based cleanup |
+| `make deploy-local`         | `conforma` (configurable via `NAMESPACE` env var) | Development workflow | File-based cleanup |
 | `make deploy-staging-local` | `conforma-local` (fixed)                         | Staging-like testing | Namespace deletion |
 
 **Examples:**
 ```bash
-# Deploy to default namespace
+# Deploy to conforma namespace
 make deploy-local
 
 # Deploy to custom namespace
@@ -204,7 +204,7 @@ make deploy-local NAMESPACE=my-dev
 make deploy-staging-local
 
 # View logs from appropriate namespace
-make logs                    # default namespace (or NAMESPACE value)
+make logs                    # conforma namespace (or NAMESPACE value)
 make logs-staging-local      # conforma-local namespace
 ```
 
@@ -260,8 +260,8 @@ If `ko build` fails:
 ### Pod Not Ready
 
 If pods don't become ready:
-- Check events: `kubectl get events -n default --sort-by='.lastTimestamp'`
-- Check pod logs: `kubectl logs -l serving.knative.dev/service=conforma-knative-service -n default`
+- Check events: `kubectl get events -n conforma --sort-by='.lastTimestamp'`
+- Check pod logs: `kubectl logs -l serving.knative.dev/service=conforma-knative-service -n conforma`
 - Verify Knative is installed: `make check-knative`
 
 ### Deployment Mode Issues
@@ -274,7 +274,7 @@ If `deploy-local` hangs or fails when `KO_DOCKER_REPO` is set:
 ### Namespace Conflicts
 
 **Local and staging deployments are isolated:**
-- `make deploy-local` → `default` namespace (or `NAMESPACE` env var)
+- `make deploy-local` → `conforma` namespace (or `NAMESPACE` env var)
 - `make deploy-staging-local` → `conforma-local` namespace
 - **They can coexist** without conflicts
 - **Use appropriate cleanup**: `make undeploy-local` vs `make undeploy-staging-local`
@@ -294,7 +294,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Snapshot
 metadata:
   name: test-snapshot
-  namespace: default
+  namespace: conforma
 spec:
   application: application-sample
   displayName: test-snapshot
@@ -420,7 +420,7 @@ For detailed information about the acceptance test framework, see the [acceptanc
 
 ### Development Tips
 
-- **Use `make deploy-local`** for all development (automatically optimized, deploys to default namespace)
+- **Use `make deploy-local`** for all development (automatically optimized, deploys to conforma namespace)
 - **Use `make deploy-local DEPLOY_MODE=registry`** to test with existing published images
 - **Use `make deploy-staging-local`** for testing with realistic staging configuration (deploys to conforma-local namespace)
 - **Use `make help`** to see all available commands

@@ -364,10 +364,10 @@ echo "  Demo resources configured"
 
 echo ""
 echo "🔑 Step 8: Creating VSA signing key secrets..."
-# Create signing key secret for TaskRun workspace in both default and user namespace
+# Create signing key secret for TaskRun workspace in both conforma and user namespace
 kubectl create secret generic vsa-demo-signing-key \
     --from-file=cosign.key="${DEMO_KEYS_DIR}/vsa-demo-keys.key" \
-    -n default --dry-run=client -o yaml | kubectl apply -f -
+    -n conforma --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret generic vsa-demo-signing-key \
     --from-file=cosign.key="${DEMO_KEYS_DIR}/vsa-demo-keys.key" \
     -n "${USER_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -

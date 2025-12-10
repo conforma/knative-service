@@ -82,7 +82,7 @@ apiVersion: appstudio.redhat.com/v1alpha1
 kind: Snapshot
 metadata:
   name: test-snapshot
-  namespace: default
+  namespace: conforma
 spec:
   application: test-app
   displayName: Test Snapshot

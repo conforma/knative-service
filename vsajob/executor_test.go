@@ -42,7 +42,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "successful job creation with all valid inputs",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				mockConfigMapGet(m, cm)
 
 				rpList := createMockReleasePlanList(
@@ -65,7 +65,7 @@ func TestCreateVSAJob(t *testing.T) {
 				m.EXPECT().Get(
 					mock.Anything,
 					mock.MatchedBy(func(key client.ObjectKey) bool {
-						return key.Namespace == "default" && key.Name == "vsa-config"
+						return key.Namespace == "conforma" && key.Name == "vsa-config"
 					}),
 					mock.AnythingOfType("*v1.ConfigMap"),
 					mock.Anything,
@@ -77,7 +77,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "invalid value in config map: CPU_REQUEST",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				cm.Data["CPU_REQUEST"] = "invalid-cpu"
 				mockConfigMapGet(m, cm)
 			},
@@ -87,7 +87,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "invalid value in config map: MEMORY_REQUEST",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				cm.Data["MEMORY_REQUEST"] = "invalid-memory"
 				mockConfigMapGet(m, cm)
 			},
@@ -97,7 +97,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "invalid value in config map: MEMORY_LIMIT",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				cm.Data["MEMORY_LIMIT"] = "invalid-memory"
 				mockConfigMapGet(m, cm)
 			},
@@ -107,7 +107,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "invalid value in config map: BACKOFF_LIMIT",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				cm.Data["BACKOFF_LIMIT"] = "invalid-backoff"
 				mockConfigMapGet(m, cm)
 			},
@@ -117,7 +117,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "invalid value in config map: WORKERS",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				cm.Data["WORKERS"] = "invalid-workers"
 				mockConfigMapGet(m, cm)
 			},
@@ -127,7 +127,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "invalid value in config map: WORKERS < 0",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				cm.Data["WORKERS"] = "-1"
 				mockConfigMapGet(m, cm)
 			},
@@ -137,7 +137,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "invalid value in config map: STRICT",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				cm.Data["STRICT"] = "yes"
 				mockConfigMapGet(m, cm)
 			},
@@ -147,7 +147,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "invalid value in config map: IGNORE_REKOR",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				cm.Data["IGNORE_REKOR"] = "yes"
 				mockConfigMapGet(m, cm)
 			},
@@ -157,7 +157,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "invalid value in config map: DEBUG",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				cm.Data["DEBUG"] = "yes"
 				mockConfigMapGet(m, cm)
 			},
@@ -167,7 +167,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "missing value in config map: PUBLIC_KEY",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				delete(cm.Data, "PUBLIC_KEY")
 				mockConfigMapGet(m, cm)
 			},
@@ -177,7 +177,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "missing value in config map: VSA_UPLOAD_URL",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				delete(cm.Data, "VSA_UPLOAD_URL")
 				mockConfigMapGet(m, cm)
 			},
@@ -187,7 +187,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "missing value in config map: VSA_SIGNING_KEY_SECRET_NAME",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				delete(cm.Data, "VSA_SIGNING_KEY_SECRET_NAME")
 				mockConfigMapGet(m, cm)
 			},
@@ -217,7 +217,7 @@ func TestCreateVSAJob(t *testing.T) {
 				Spec:      []byte(`{invalid json`),
 			},
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				mockConfigMapGet(m, cm)
 			},
 			expectedError: "failed to unmarshal snapshot spec to extract application",
@@ -226,7 +226,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "no release plan found in namespace",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				mockConfigMapGet(m, cm)
 
 				emptyList := createMockReleasePlanList()
@@ -238,7 +238,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "release plan lookup failure",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				mockConfigMapGet(m, cm)
 
 				// Mock List for ReleasePlans - return error
@@ -254,7 +254,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "no matching release plan found for snapshot",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				mockConfigMapGet(m, cm)
 
 				rpList := createMockReleasePlanList(
@@ -268,7 +268,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "multiple release plans found for snapshot, using the first one",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				mockConfigMapGet(m, cm)
 
 				rpList := createMockReleasePlanList(
@@ -288,7 +288,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "release plan admission lookup failure",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				mockConfigMapGet(m, cm)
 
 				rpList := createMockReleasePlanList(
@@ -312,7 +312,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "error creating job",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				mockConfigMapGet(m, cm)
 
 				rpList := createMockReleasePlanList(
@@ -331,7 +331,7 @@ func TestCreateVSAJob(t *testing.T) {
 			name:     "no policy specified in RPA, use default ECP name",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
-				cm := createMockConfigMap("default", "vsa-config")
+				cm := createMockConfigMap("conforma", "vsa-config")
 				mockConfigMapGet(m, cm)
 
 				rpList := createMockReleasePlanList(
