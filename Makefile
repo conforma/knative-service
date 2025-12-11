@@ -201,6 +201,9 @@ lint: ## Run linter
 fmt: ## Format code
 	@echo "Formatting code..."
 	go fmt ./...
+	cd acceptance && go fmt ./...
+	@# go fmt ignores this due to the build tag, so we use gofmt
+	gofmt -w tools/tools.go
 
 .PHONY: tidy
 tidy: ## Tidy go modules
