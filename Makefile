@@ -1,6 +1,6 @@
 # === CONFIGURATION VARIABLES ===
 KUBECONFIG ?= $(HOME)/.kube/config
-NAMESPACE ?= default
+NAMESPACE ?= conforma
 KO_DOCKER_REPO ?= ko.local
 DEPLOY_MODE ?= auto
 KNATIVE_VERSION ?= v1.18.2
@@ -201,6 +201,9 @@ lint: ## Run linter
 fmt: ## Format code
 	@echo "Formatting code..."
 	go fmt ./...
+	cd acceptance && go fmt ./...
+	@# go fmt ignores this due to the build tag, so we use gofmt
+	gofmt -w tools/tools.go
 
 .PHONY: tidy
 tidy: ## Tidy go modules

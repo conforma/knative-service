@@ -551,7 +551,7 @@ func applyYAMLData(ctx context.Context, cluster *kubernetes.ClusterState, yamlDa
 		if mapping.Scope.Name() == "namespace" {
 			namespace := obj.GetNamespace()
 			if namespace == "" {
-				namespace = "default"
+				namespace = "conforma"
 			}
 			resourceInterface = dynamicClient.Resource(mapping.Resource).Namespace(namespace)
 		}

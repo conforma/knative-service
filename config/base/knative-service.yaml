@@ -18,6 +18,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: conforma-knative-service
+  namespace: conforma
   labels:
     app: conforma-knative-service
 spec:
@@ -62,6 +63,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: conforma-knative-service
+  namespace: conforma
   labels:
     app: conforma-knative-service
 spec:
