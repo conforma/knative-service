@@ -277,6 +277,96 @@ OF/2NxApJCzGCEDdfSp6VQO30hyhRANCAAQRWz+jn65BtOMvdyHKcvjBeBSDZH2r
 	return nil
 }
 
+// waitForVSASigningSecret waits for the GitOps job to create the VSA signing secret
+func waitForVSASigningSecret(ctx context.Context, cluster *kubernetes.ClusterState, namespace string) error {
+	logger, ctx := log.LoggerFor(ctx)
+	logger.Infof("Waiting for VSA signing secret to be created by GitOps job in namespace %s", namespace)
+
+	clusterImpl := cluster.Cluster()
+	if clusterImpl == nil {
+		return fmt.Errorf("cluster not initialized")
+	}
+
+	dynamicClient := clusterImpl.Dynamic()
+	if dynamicClient == nil {
+		return fmt.Errorf("dynamic client not available")
+	}
+
+	secretGVR := schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "secrets",
+	}
+
+	jobGVR := schema.GroupVersionResource{
+		Group:    "batch",
+		Version:  "v1",
+		Resource: "jobs",
+	}
+
+	// Wait for both the job to complete and the secret to exist
+	err := wait.PollImmediate(5*time.Second, 3*time.Minute, func() (bool, error) {
+		// Check if the job has completed successfully
+		job, err := dynamicClient.Resource(jobGVR).Namespace(namespace).Get(ctx, "conforma-vsa-signing-secret", metav1.GetOptions{})
+		if err != nil {
+			logger.Infof("GitOps job not found yet: %v", err)
+			return false, nil
+		}
+
+		// Check job status
+		status, found, err := unstructured.NestedMap(job.Object, "status")
+		if err != nil || !found {
+			logger.Info("Job status not available yet")
+			return false, nil
+		}
+
+		// Check for completion conditions
+		conditions, found, err := unstructured.NestedSlice(status, "conditions")
+		if err == nil && found && len(conditions) > 0 {
+			for _, cond := range conditions {
+				if condition, ok := cond.(map[string]interface{}); ok {
+					condType, typeFound, _ := unstructured.NestedString(condition, "type")
+					condStatus, statusFound, _ := unstructured.NestedString(condition, "status")
+
+					if typeFound && statusFound && condStatus == "True" {
+						if condType == "Complete" {
+							logger.Info("GitOps job completed successfully")
+							// Job completed, now check if secret exists
+							break
+						} else if condType == "Failed" {
+							return false, fmt.Errorf("GitOps job failed")
+						}
+					}
+				}
+			}
+		}
+
+		// Check if the vsa-signing-key secret exists
+		_, err = dynamicClient.Resource(secretGVR).Namespace(namespace).Get(ctx, "vsa-signing-key", metav1.GetOptions{})
+		if err != nil {
+			logger.Infof("VSA signing key secret not found yet: %v", err)
+			return false, nil
+		}
+
+		// Check if the vsa-public-key secret exists (created by the job)
+		_, err = dynamicClient.Resource(secretGVR).Namespace(namespace).Get(ctx, "vsa-public-key", metav1.GetOptions{})
+		if err != nil {
+			logger.Infof("VSA public key secret not found yet: %v", err)
+			return false, nil
+		}
+
+		logger.Info("Both VSA signing secrets are ready")
+		return true, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("VSA signing secret not ready after 3 minutes: %w", err)
+	}
+
+	logger.Infof("VSA signing secrets created successfully in namespace %s", namespace)
+	return nil
+}
+
 // deployService deploys the knative service using ko and kustomize
 func deployService(ctx context.Context, cluster *kubernetes.ClusterState, namespace string) error {
 	logger, ctx := log.LoggerFor(ctx)
@@ -308,16 +398,16 @@ func deployService(ctx context.Context, cluster *kubernetes.ClusterState, namesp
 		return fmt.Errorf("failed to replace image reference: %w", err)
 	}
 
-	// 4. Create VSA signing key secret for Jobs
-	logger.Info("Creating VSA signing key secret...")
-	if err := createVSASigningKeySecret(ctx, cluster, namespace); err != nil {
-		return fmt.Errorf("failed to create VSA signing key secret: %w", err)
-	}
-
-	// 5. Apply the configuration to the cluster
+	// 4. Apply the configuration to the cluster
 	logger.Info("Applying service configuration to cluster...")
 	if err := applyYAMLData(ctx, cluster, yamlData); err != nil {
 		return fmt.Errorf("failed to apply service configuration: %w", err)
+	}
+
+	// 5. Wait for VSA signing key secret to be created by GitOps job
+	logger.Info("Waiting for VSA signing key secret to be created...")
+	if err := waitForVSASigningSecret(ctx, cluster, namespace); err != nil {
+		return fmt.Errorf("failed to wait for VSA signing key secret: %w", err)
 	}
 
 	logger.Info("Service deployed successfully")
