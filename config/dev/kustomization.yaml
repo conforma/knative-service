@@ -23,3 +23,9 @@ resources:
   - https://raw.githubusercontent.com/konflux-ci/application-api/refs/heads/main/manifests/application-api-customresourcedefinitions.yaml
   - https://raw.githubusercontent.com/konflux-ci/release-service/refs/heads/main/config/crd/bases/appstudio.redhat.com_releaseplanadmissions.yaml
   - https://raw.githubusercontent.com/konflux-ci/release-service/refs/heads/main/config/crd/bases/appstudio.redhat.com_releaseplans.yaml
+
+# Override the production quay.io image with ko:// for local development
+# This allows devs to test local code changes without pushing to a registry
+images:
+  - name: quay.io/conforma/knative-service
+    newName: ko://github.com/conforma/knative-service/cmd/trigger-vsa

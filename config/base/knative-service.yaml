@@ -34,7 +34,7 @@ spec:
       serviceAccountName: conforma-knative-service
       containers:
         - name: conforma
-          image: ko://github.com/conforma/knative-service/cmd/trigger-vsa
+          image: quay.io/conforma/knative-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

@@ -358,7 +358,6 @@ func waitForVSASigningSecret(ctx context.Context, cluster *kubernetes.ClusterSta
 		logger.Info("Both VSA signing secrets are ready")
 		return true, nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("VSA signing secret not ready after 3 minutes: %w", err)
 	}
@@ -493,7 +492,6 @@ func waitForServiceReady(ctx context.Context, cluster *kubernetes.ClusterState, 
 		logger.Info("Service deployment not ready yet...")
 		return false, nil
 	})
-
 	// If we timed out, provide additional diagnostics
 	if err != nil {
 		logger.Errorf("Service deployment failed to become ready: %v", err)
@@ -1016,9 +1014,10 @@ func buildAndPushImage(ctx context.Context) (string, error) {
 
 // replaceImageAndNamespace replaces ko:// references and sets the namespace in YAML
 func replaceImageAndNamespace(yamlData []byte, imageRef, namespace string) ([]byte, error) {
-	// Replace the ko:// image reference with the actual built image
-	koImagePattern := "ko://github.com/conforma/knative-service/cmd/trigger-vsa"
-	modifiedYAML := bytes.ReplaceAll(yamlData, []byte(koImagePattern), []byte(imageRef))
+	// We want to build the image and test it rather than use this
+	// Todo: This big search and replace is clunky. Maybe we can do it more nicely with Kustomize.
+	serviceImageRef := "quay.io/conforma/knative-service:latest"
+	modifiedYAML := bytes.ReplaceAll(yamlData, []byte(serviceImageRef), []byte(imageRef))
 
 	// Parse each document and set the namespace
 	var result []byte
