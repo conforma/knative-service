@@ -228,7 +228,7 @@ If `ko build` fails:
 
 If pods don't become ready:
 - Check events: `kubectl get events -n conforma --sort-by='.lastTimestamp'`
-- Check pod logs: `kubectl logs -l serving.knative.dev/service=conforma-knative-service -n conforma`
+- Check pod logs: `kubectl logs -l app=conforma-knative-service -n conforma`
 - Verify Knative is installed: `make check-knative`
 
 ### Deployment Mode Issues
@@ -338,7 +338,7 @@ The project includes comprehensive acceptance tests using Godog/Cucumber for beh
 - Tekton TaskRun creation and execution
 - VSA (Verification Summary Attestation) generation and Rekor integration
 - Multi-component snapshot handling
-- Knative Serving and Eventing integration
+- Knative Eventing integration
 
 **Current Status**: ✅ **PRODUCTION READY** - All 3 acceptance test scenarios are fully implemented with production-grade Kubernetes integrations.
 

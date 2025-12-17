@@ -55,7 +55,6 @@ const knativeStateKey = key(0)
 
 // KnativeState holds the state of Knative components
 type KnativeState struct {
-	servingInstalled  bool
 	eventingInstalled bool
 	serviceDeployed   bool
 	serviceURL        string
@@ -75,7 +74,7 @@ func installKnative(ctx context.Context) (context.Context, error) {
 		return ctx, err
 	}
 
-	if k.servingInstalled && k.eventingInstalled {
+	if k.eventingInstalled {
 		return ctx, nil
 	}
 
@@ -86,18 +85,8 @@ func installKnative(ctx context.Context) (context.Context, error) {
 	cluster := testenv.FetchState[kubernetes.ClusterState](ctx)
 	if cluster == nil {
 		// Defensive check: allow nil cluster for unit tests
-		k.servingInstalled = true
 		k.eventingInstalled = true
 		return ctx, nil
-	}
-
-	// Verify Knative Serving is installed (should already be installed by cluster setup)
-	if !k.servingInstalled {
-		logger.Info("Verifying Knative Serving installation...")
-		if err := verifyKnativeServing(ctx, cluster); err != nil {
-			return ctx, fmt.Errorf("Knative Serving not properly installed: %w", err)
-		}
-		k.servingInstalled = true
 	}
 
 	// Verify Knative Eventing is installed (should already be installed by cluster setup)
@@ -113,30 +102,6 @@ func installKnative(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-// verifyKnativeServing verifies that Knative Serving components are installed and ready
-func verifyKnativeServing(ctx context.Context, cluster *kubernetes.ClusterState) error {
-	logger, ctx := log.LoggerFor(ctx)
-
-	clusterImpl := cluster.Cluster()
-	if clusterImpl == nil {
-		return fmt.Errorf("cluster not initialized")
-	}
-
-	// Wait for Knative Serving components to be ready
-	logger.Info("Waiting for Knative Serving components to be ready...")
-	if err := waitForDeployments(ctx, cluster, "knative-serving", 5*time.Minute); err != nil {
-		return fmt.Errorf("Knative Serving components not ready: %w", err)
-	}
-
-	// Wait for Kourier networking to be ready
-	logger.Info("Waiting for Kourier networking to be ready...")
-	if err := waitForDeployments(ctx, cluster, "kourier-system", 5*time.Minute); err != nil {
-		return fmt.Errorf("Kourier components not ready: %w", err)
-	}
-
-	logger.Info("Knative Serving is ready")
-	return nil
-}
 
 // verifyKnativeEventing verifies that Knative Eventing components are installed and ready
 func verifyKnativeEventing(ctx context.Context, cluster *kubernetes.ClusterState) error {
@@ -165,7 +130,6 @@ func deployKnativeService(ctx context.Context) (context.Context, error) {
 	if k == nil {
 		// Initialize knative state if not found
 		k = &KnativeState{
-			servingInstalled:  true,
 			eventingInstalled: true,
 			serviceDeployed:   false,
 		}
