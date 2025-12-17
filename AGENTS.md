@@ -67,13 +67,6 @@ make deploy-local DEPLOY_MODE=registry KO_DOCKER_REPO=quay.io/conforma/knative-s
 make deploy-local NAMESPACE=my-namespace
 ```
 
-### Staging-like Testing
-```bash
-# Deploy using staging configuration in isolated namespace
-make deploy-staging-local   # Deploys to conforma-local namespace
-make logs-staging-local
-make undeploy-staging-local
-```
 
 ### Acceptance Tests
 ```bash
@@ -286,8 +279,7 @@ The Makefile automatically optimizes for kind clusters:
 ### Namespace Isolation
 
 - **Default deployment**: Uses `conforma` namespace (or `NAMESPACE` env var)
-- **Staging deployment**: Uses `conforma-local` namespace (fixed)
-- Local and staging deployments can coexist without conflicts
+- Multiple deployments can coexist using different namespace configurations
 
 ### Configuration via ConfigMap
 

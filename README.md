@@ -63,7 +63,7 @@ This will automatically:
 
 **Expected Duration:** ~1-2 minutes for kind clusters
 
-**Note**: This deploys to the `conforma` namespace by default (configurable via `NAMESPACE` env var). For staging-like testing in an isolated namespace, use `make deploy-staging-local` instead.
+**Note**: This deploys to the `conforma` namespace by default (configurable via `NAMESPACE` env var).
 
 ### 3. Test the Service
 
@@ -165,47 +165,18 @@ make deploy-local DEPLOY_MODE=registry KO_DOCKER_REPO=localhost:5000/myapp:dev
 | `make deploy-local DEPLOY_MODE=registry` | 0s         | ~30-60s     | ~30-60s    | Testing with existing images     |
 | Legacy registry build                    | ~60s       | ~2-5min     | ~3-6min    | Building and pushing to registry |
 
-## Staging-like Testing
-
-Test locally using Red Hat App Studio staging configuration:
-
-```bash
-# Deploy using infra-deployments staging config
-make deploy-staging-local
-
-# This fetches the actual staging configuration from infra-deployments
-# and deploys it locally in the 'conforma-local' namespace for realistic testing
-
-# View logs from staging deployment
-make logs-staging-local
-
-# Clean up staging deployment
-make undeploy-staging-local
-```
 
 ### **Namespace Usage**
 
-Our deployment targets use different namespaces for isolation:
-
-| Target                      | Namespace                                        | Purpose              | Cleanup Method     |
-| --------------------------- | ------------------------------------------------ | -------------------- | ------------------ |
-| `make deploy-local`         | `conforma` (configurable via `NAMESPACE` env var) | Development workflow | File-based cleanup |
-| `make deploy-staging-local` | `conforma-local` (fixed)                         | Staging-like testing | Namespace deletion |
+The deployment target uses the `conforma` namespace by default, which can be customized via the `NAMESPACE` environment variable:
 
 **Examples:**
 ```bash
-# Deploy to conforma namespace
+# Deploy to conforma namespace (default)
 make deploy-local
 
 # Deploy to custom namespace
 make deploy-local NAMESPACE=my-dev
-
-# Deploy to staging namespace (always conforma-local)
-make deploy-staging-local
-
-# View logs from appropriate namespace
-make logs                    # conforma namespace (or NAMESPACE value)
-make logs-staging-local      # conforma-local namespace
 ```
 
 ## Make Targets
@@ -232,10 +203,6 @@ make logs-staging-local      # conforma-local namespace
 - `make test-local` - Test with sample snapshot
 - `make status` - Show deployment status
 
-### Staging-like Testing
-- `make deploy-staging-local` - Deploy using infra-deployments staging config (conforma-local namespace)
-- `make undeploy-staging-local` - Remove staging-local deployment (deletes conforma-local namespace)
-- `make logs-staging-local` - View staging-local service logs (conforma-local namespace)
 
 ### Convenience
 - `make help` - Show all available targets with descriptions
@@ -273,11 +240,7 @@ If `deploy-local` hangs or fails when `KO_DOCKER_REPO` is set:
 
 ### Namespace Conflicts
 
-**Local and staging deployments are isolated:**
-- `make deploy-local` → `conforma` namespace (or `NAMESPACE` env var)
-- `make deploy-staging-local` → `conforma-local` namespace
-- **They can coexist** without conflicts
-- **Use appropriate cleanup**: `make undeploy-local` vs `make undeploy-staging-local`
+The service deploys to the `conforma` namespace by default (or the value of `NAMESPACE` env var). Use `make undeploy-local` to clean up the deployment.
 
 ## Usage
 
@@ -422,14 +385,12 @@ For detailed information about the acceptance test framework, see the [acceptanc
 
 - **Use `make deploy-local`** for all development (automatically optimized, deploys to conforma namespace)
 - **Use `make deploy-local DEPLOY_MODE=registry`** to test with existing published images
-- **Use `make deploy-staging-local`** for testing with realistic staging configuration (deploys to conforma-local namespace)
 - **Use `make help`** to see all available commands
 - **Setup and deploy**: `make setup-knative && make deploy-local` for complete setup
-- **Namespace isolation**: Local and staging deployments use separate namespaces and can coexist
 - **Run acceptance tests**: `make acceptance` for comprehensive end-to-end testing
 - The locally built image includes your latest code changes
 - Kind cluster persists between sessions unless deleted
-- Use appropriate undeploy target for the namespace you want to clean up
+- Use `make undeploy-local` to clean up deployments
 
 ## Container Images
 

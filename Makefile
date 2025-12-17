@@ -8,7 +8,6 @@ KNATIVE_VERSION ?= v1.18.2
 # === PROJECT CONSTANTS ===
 SERVICE_NAME := conforma-knative-service
 IMAGE_PATH := ko://github.com/conforma/knative-service/cmd/trigger-vsa
-STAGING_NAMESPACE := conforma-local
 SERVICE_SELECTOR := app=$(SERVICE_NAME)
 EVENT_SOURCE_SELECTOR := eventing.knative.dev/sourceName=snapshot-events
 
@@ -32,7 +31,7 @@ deploy_with_image() { echo "🚀 Deploying to cluster..." >&2; kustomize build c
 wait_for_deployment() { echo "⏳ Waiting for pods to be ready..." >&2; hack/wait-for-ready-pod.sh $(SERVICE_SELECTOR) $(NAMESPACE); echo "⏳ Waiting for ApiServerSource to be ready..." >&2; kubectl wait --for=condition=Ready apiserversource/snapshot-events -n $(NAMESPACE) --timeout=300s || true; }; \
 show_service_url() { echo "✅ Deployment complete!"; echo "Service URL:"; kubectl get service $(SERVICE_NAME) -n $(NAMESPACE) -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].port}' && echo; }; \
 show_logs() { local namespace=$$1; local suffix=$$2; echo "Showing logs from $(SERVICE_NAME)$$suffix..."; kubectl logs -n $$namespace -l $(SERVICE_SELECTOR) --tail=100 -f; }; \
-undeploy_from_namespace() { local target_namespace=$$1; local suffix=$$2; echo "Removing $(SERVICE_NAME)$$suffix..."; if [ "$$target_namespace" = "$(STAGING_NAMESPACE)" ]; then kubectl delete namespace $$target_namespace --ignore-not-found; echo "Staging-local undeployment complete!"; else kustomize build config/dev/ | ko delete --ignore-not-found -f -; echo "Undeployment complete!"; fi; }
+undeploy_from_namespace() { local target_namespace=$$1; local suffix=$$2; echo "Removing $(SERVICE_NAME)$$suffix..."; kustomize build config/dev/ | ko delete --ignore-not-found -f -; echo "Undeployment complete!"; }
 
 # === DEFAULT TARGET ===
 .PHONY: help
@@ -98,44 +97,12 @@ deploy-local: check-knative ## Deploy the service to local development environme
 	wait_for_deployment; \
 	show_service_url
 
-.PHONY: deploy-staging-local
-deploy-staging-local: check-knative ## Deploy locally using infra-deployments staging configuration
-	@echo "Deploying $(SERVICE_NAME) using infra-deployments staging config..."
-	@echo "Using KO_DOCKER_REPO: $(KO_DOCKER_REPO)"
-	@echo "Fetching staging configuration from infra-deployments..."
-	@trap 'rm -rf /tmp/staging-remote /tmp/staging-kustomization.yaml /tmp/fallback-staging' EXIT; \
-	if curl -s https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/main/components/conforma-knative-service/staging/kustomization.yaml > /tmp/staging-kustomization.yaml 2>/dev/null && [ -s /tmp/staging-kustomization.yaml ] && ! grep -q "404" /tmp/staging-kustomization.yaml; then \
-		echo "✅ Found infra-deployments staging config"; \
-		mkdir -p /tmp/staging-remote; \
-		sed 's/namespace: .*/namespace: $(STAGING_NAMESPACE)/' /tmp/staging-kustomization.yaml > /tmp/staging-remote/kustomization.yaml; \
-		kustomize build /tmp/staging-remote | KO_DOCKER_REPO=$(KO_DOCKER_REPO) ko apply --bare -f -; \
-	else \
-		echo "⚠️  infra-deployments staging config not yet available, using fallback..."; \
-		echo "Creating namespace..."; \
-		kubectl create namespace $(STAGING_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -; \
-		echo "Deploying with basic configuration..."; \
-		mkdir -p /tmp/fallback-staging; \
-		cp -r config/base/* /tmp/fallback-staging/; \
-		echo "apiVersion: kustomize.config.k8s.io/v1beta1" > /tmp/fallback-staging/kustomization.yaml; \
-		echo "kind: Kustomization" >> /tmp/fallback-staging/kustomization.yaml; \
-		echo "namespace: $(STAGING_NAMESPACE)" >> /tmp/fallback-staging/kustomization.yaml; \
-		echo "resources:" >> /tmp/fallback-staging/kustomization.yaml; \
-		for file in $$(ls /tmp/fallback-staging/*.yaml | grep -v kustomization); do echo "- $$(basename $$file)" >> /tmp/fallback-staging/kustomization.yaml; done; \
-		kustomize build /tmp/fallback-staging | KO_DOCKER_REPO=$(KO_DOCKER_REPO) ko apply --bare -f -; \
-	fi
-	@echo "Staging-local deployment complete!"
-	@echo "Service URL:"
-	@kubectl get service $(SERVICE_NAME) -n $(STAGING_NAMESPACE) -o jsonpath='{.spec.clusterIP}:{.spec.ports[0].port}' && echo
 
 .PHONY: undeploy-local
 undeploy-local: ## Remove the local deployment
 	@$(SHELL_FUNCTIONS); \
 	undeploy_from_namespace "$(NAMESPACE)" ""
 
-.PHONY: undeploy-staging-local
-undeploy-staging-local: ## Remove the staging-local deployment
-	@$(SHELL_FUNCTIONS); \
-	undeploy_from_namespace "$(STAGING_NAMESPACE)" " from staging-local environment"
 
 # === TESTING TARGETS ===
 .PHONY: test
@@ -172,10 +139,6 @@ logs: ## Show logs from the service
 	@$(SHELL_FUNCTIONS); \
 	show_logs "$(NAMESPACE)" ""
 
-.PHONY: logs-staging-local
-logs-staging-local: ## Show logs from the staging-local service
-	@$(SHELL_FUNCTIONS); \
-	show_logs "$(STAGING_NAMESPACE)" " in staging-local environment"
 
 .PHONY: status
 status: ## Show deployment status
