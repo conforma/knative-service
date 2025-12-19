@@ -235,7 +235,7 @@ func getWorkingNamespaceFromCluster(ctx context.Context, cluster *kubernetes.Clu
 		return "", fmt.Errorf("dynamic client not available")
 	}
 
-	// List all namespaces and find the one with knative-test- prefix
+	// List all namespaces and find the one with name 'conforma'
 	gvr := schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
@@ -249,12 +249,12 @@ func getWorkingNamespaceFromCluster(ctx context.Context, cluster *kubernetes.Clu
 
 	for _, ns := range namespaces.Items {
 		name := ns.GetName()
-		if len(name) > 13 && name[:13] == "knative-test-" {
+		if name == "conforma" {
 			return name, nil
 		}
 	}
 
-	return "", fmt.Errorf("no working namespace found with knative-test- prefix")
+	return "", fmt.Errorf("no working namespace found with name 'conforma'")
 }
 
 // createSnapshotInCluster creates the snapshot resource in the cluster
@@ -270,7 +270,7 @@ func createSnapshotInCluster(ctx context.Context) (context.Context, error) {
 	}
 
 	// Get the working namespace from the cluster
-	// This should be the test namespace like knative-test-XXXXX
+	// This should be the test namespace 'conforma'
 	workingNamespace, err := getWorkingNamespaceFromCluster(ctx, cluster)
 	if err != nil {
 		return ctx, fmt.Errorf("failed to get working namespace: %w", err)

@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -568,16 +569,27 @@ func (k *kindCluster) CreateNamespace(ctx context.Context) (context.Context, err
 		return ctx, nil
 	}
 
+	// Todo: Should probably create this from the yaml data..?
 	namespace, err := k.client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "knative-test-",
+			Name: "conforma",
 		},
 	}, metav1.CreateOptions{})
 	if err != nil {
-		return ctx, err
+		// Check if namespace already exists (e.g., from GitOps deployment)
+		if strings.Contains(err.Error(), "already exists") {
+			// Namespace already exists, just get it
+			existingNS, getErr := k.client.CoreV1().Namespaces().Get(ctx, "conforma", metav1.GetOptions{})
+			if getErr != nil {
+				return ctx, fmt.Errorf("namespace exists but failed to get it: %w", getErr)
+			}
+			t.namespace = existingNS.GetName()
+		} else {
+			return ctx, err
+		}
+	} else {
+		t.namespace = namespace.GetName()
 	}
-
-	t.namespace = namespace.GetName()
 
 	return ctx, nil
 }
@@ -704,7 +716,6 @@ func installKnativeComponents(ctx context.Context, k *kindCluster) error {
 	logger.Info("Knative Eventing installed successfully")
 	return nil
 }
-
 
 // refreshRESTMapper refreshes the REST mapper to pick up newly installed CRDs
 func refreshRESTMapper(ctx context.Context, k *kindCluster) error {

@@ -102,7 +102,6 @@ func installKnative(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-
 // verifyKnativeEventing verifies that Knative Eventing components are installed and ready
 func verifyKnativeEventing(ctx context.Context, cluster *kubernetes.ClusterState) error {
 	logger, ctx := log.LoggerFor(ctx)
@@ -870,7 +869,7 @@ func getWorkingNamespace(ctx context.Context) (string, error) {
 	// It's stored in the kind.testState, but we can't access it directly from here
 	// We'll need to add a method to the Cluster interface to get the namespace
 
-	// For now, try to find a namespace with the knative-test- prefix
+	// For now, try to find the 'conforma' namespace
 	// This is a workaround until we can properly expose the namespace
 	clusterImpl := cluster.Cluster()
 	if clusterImpl == nil {
@@ -882,7 +881,7 @@ func getWorkingNamespace(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("dynamic client not available")
 	}
 
-	// List all namespaces and find the one with knative-test- prefix
+	// List all namespaces and find the one with name 'conforma'
 	gvr := schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
@@ -896,12 +895,12 @@ func getWorkingNamespace(ctx context.Context) (string, error) {
 
 	for _, ns := range namespaces.Items {
 		name := ns.GetName()
-		if len(name) > 13 && name[:13] == "knative-test-" {
+		if name == "conforma" {
 			return name, nil
 		}
 	}
 
-	return "", fmt.Errorf("no working namespace found with knative-test- prefix")
+	return "", fmt.Errorf("no working namespace found with name 'conforma'")
 }
 
 // buildAndPushImage builds the ko image and pushes it to the registry
