@@ -121,8 +121,9 @@ jobs:
         echo "🔍 Testing container build..."
 
         # Install ko
-        go install github.com/google/ko@latest
-        
+        # Fixme: To use a newer version we need to update to golang 1.25
+        go install github.com/google/ko@v0.18.0
+
         # Test build (don't push)
         KO_DOCKER_REPO=ko.local ko build --local ./cmd/trigger-vsa
         echo "✅ Container builds successfully"
