@@ -31,7 +31,7 @@ jobs:
     name: Add PR Comment
     runs-on: ubuntu-latest
     if: github.event.workflow_run.event == 'pull_request'
-    
+
     steps:
     - name: Download validation results
       uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
@@ -58,9 +58,9 @@ jobs:
         issue-number: ${{ steps.context.outputs.pr_number }}
         body: |
           ## ✅ Validation Successful
-          
+
           All checks passed! Your PR is ready for review.
-          
+
           **Validation Results:**
           - ✅ Code formatting
           - ✅ License headers
@@ -69,10 +69,10 @@ jobs:
           - ✅ Kubernetes manifests
           - ✅ Container build
           - ✅ Security scan
-          
+
           <details>
           <summary>View workflow details</summary>
-          
+
           **Workflow:** [${{ github.event.workflow_run.name }}](${{ github.event.workflow_run.html_url }})
           **Commit:** ${{ github.event.workflow_run.head_sha }}
           </details>
@@ -84,9 +84,9 @@ jobs:
         issue-number: ${{ steps.context.outputs.pr_number }}
         body: |
           ## ❌ Validation Failed
-          
+
           Some checks failed. Please review and fix the issues.
-          
+
           **Next Steps:**
           1. Check the [workflow logs](${{ github.event.workflow_run.html_url }}) for details
           2. Fix any failing checks locally:
@@ -95,10 +95,10 @@ jobs:
              - Tests: `go test ./...`
              - Lint: `golangci-lint run`
           3. Push your fixes to update this PR
-          
+
           <details>
           <summary>View workflow details</summary>
-          
+
           **Workflow:** [${{ github.event.workflow_run.name }}](${{ github.event.workflow_run.html_url }})
           **Commit:** ${{ github.event.workflow_run.head_sha }}
           **Status:** ${{ steps.context.outputs.job_status }}
