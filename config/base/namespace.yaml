@@ -14,16 +14,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
----
-# Create a default broker in the default namespace for testing
-apiVersion: eventing.knative.dev/v1
-kind: Broker
+apiVersion: v1
+kind: Namespace
 metadata:
-  name: default
-  namespace: default
-spec:
-  config:
-    apiVersion: v1
-    kind: ConfigMap
-    name: config-br-default-channel
-    namespace: knative-eventing
+  name: conforma
+  labels:
+    app.kubernetes.io/name: conforma
+    app.kubernetes.io/part-of: conforma

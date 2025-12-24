@@ -38,7 +38,7 @@ jobs:
     name: Test and Validate
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -104,25 +104,26 @@ jobs:
         # Install kustomize
         curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
         sudo mv kustomize /usr/local/bin/
-        
+
         # Validate base configuration
         echo "🔍 Validating base Kubernetes manifests..."
         kustomize build config/base/ > /tmp/base-manifests.yaml
-        
+
         # Validate dev configuration
         echo "🔍 Validating dev Kubernetes manifests..."
         kustomize build config/dev/ > /tmp/dev-manifests.yaml
-        
+
         echo "✅ Kubernetes manifests are valid"
 
     - name: Test container build
       run: |
         set -euo pipefail
         echo "🔍 Testing container build..."
-        
+
         # Install ko
-        go install github.com/google/ko@latest
-        
+        # Fixme: To use a newer version we need to update to golang 1.25
+        go install github.com/google/ko@v0.18.0
+
         # Test build (don't push)
         KO_DOCKER_REPO=ko.local ko build --local ./cmd/trigger-vsa
         echo "✅ Container builds successfully"
@@ -154,7 +155,7 @@ jobs:
         # Create results summary
         echo "## Validation Results" > validation-results.md
         echo "" >> validation-results.md
-        
+
         if [ "${{ job.status }}" = "success" ]; then
           echo "✅ All validation checks passed!" >> validation-results.md
           echo "- Format check: ✅" >> validation-results.md
@@ -168,7 +169,7 @@ jobs:
           echo "❌ Some validation checks failed!" >> validation-results.md
           echo "Please check the workflow logs for details." >> validation-results.md
         fi
-        
+
         echo "pr_number=${{ github.event.number }}" > validation-context.txt
         echo "job_status=${{ job.status }}" >> validation-context.txt
 
