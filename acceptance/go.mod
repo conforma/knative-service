@@ -6,7 +6,7 @@ toolchain go1.24.11
 
 require (
 	github.com/cucumber/godog v0.14.1
-	github.com/gkampitakis/go-snaps v0.5.18
+	github.com/gkampitakis/go-snaps v0.5.19
 	github.com/phayes/freeport v0.0.0-20220201140144-74d24b5ae9f5
 	github.com/pkg/errors v0.9.1
 	k8s.io/api v0.34.3
