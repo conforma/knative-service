@@ -184,14 +184,22 @@ func TestCreateVSAJob(t *testing.T) {
 			expectedError: "VSA_UPLOAD_URL is required",
 		},
 		{
-			name:     "missing value in config map: VSA_SIGNING_KEY_SECRET_NAME",
+			name:     "missing value in config map: VSA_SIGNING_KEY_SECRET_NAME uses default",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
 				cm := createMockConfigMap("conforma", "vsa-config")
 				delete(cm.Data, "VSA_SIGNING_KEY_SECRET_NAME")
 				mockConfigMapGet(m, cm)
+
+				// Let it fail at ReleasePlan lookup to keep test lightweight
+				// We just want to verify it doesn't fail with "VSA_SIGNING_KEY_SECRET_NAME is required"
+				m.EXPECT().List(
+					mock.Anything,
+					mock.AnythingOfType("*vsajob.ReleasePlanList"),
+					mock.Anything,
+				).Return(assert.AnError).Once()
 			},
-			expectedError: "VSA_SIGNING_KEY_SECRET_NAME is required",
+			expectedError: "failed to lookup release plan", // Should fail later, not at config validation
 		},
 		{
 			name:     "missing snapshot name in snapshot",

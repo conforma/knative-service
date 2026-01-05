@@ -108,10 +108,12 @@ undeploy-local: ## Remove the local deployment
 .PHONY: test
 test: ## Run tests
 	@echo "Running tests..."
+	cd vsajob && go test ./... -v
 	cd cmd/trigger-vsa && go test ./... -v
 
 .PHONY: quiet-test
 quiet-test: ## Run tests without -v
+	@cd vsajob && go test ./...
 	@cd cmd/trigger-vsa && go test ./...
 
 .PHONY: test-coverage
