@@ -489,8 +489,7 @@ func (e *executor) buildJob(
 		"text",
 		"--vsa",
 		"--vsa-signing-key",
-		// Once https://github.com/conforma/cli/pull/3067 is merged we can remove the "cosign.key" part
-		fmt.Sprintf("k8s://%s/%s/cosign.key", e.namespace, vsaOpts.VSASigningKeySecretName),
+		fmt.Sprintf("k8s://%s/%s", e.namespace, vsaOpts.VSASigningKeySecretName),
 		"--vsa-upload",
 		vsaOpts.VSAUploadURL,
 		"--show-successes",
