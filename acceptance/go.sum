@@ -36,6 +36,8 @@ github.com/gkampitakis/go-snaps v0.5.17 h1:CaUQUoYrmALOcHTtlKx6ZTfpN3P1qRASu6BN4
 github.com/gkampitakis/go-snaps v0.5.17/go.mod h1:gC3YqxQTPyIXvQrw/Vpt3a8VqR1MO8sVpZFWN4DGwNs=
 github.com/gkampitakis/go-snaps v0.5.18 h1:oZaQoonWI4KX3c9LNSWsxby8SM6EL+mex4KgLjzfIWg=
 github.com/gkampitakis/go-snaps v0.5.18/go.mod h1:gC3YqxQTPyIXvQrw/Vpt3a8VqR1MO8sVpZFWN4DGwNs=
+github.com/gkampitakis/go-snaps v0.5.19 h1:hUJlCQOpTt1M+kSisMwioDWZDWpDtdAvUhvWCx1YGW0=
+github.com/gkampitakis/go-snaps v0.5.19/go.mod h1:gC3YqxQTPyIXvQrw/Vpt3a8VqR1MO8sVpZFWN4DGwNs=
 github.com/go-errors/errors v1.4.2 h1:J6MZopCL4uSllY1OfXM374weqZFFItUbrImctkmUxIA=
 github.com/go-errors/errors v1.4.2/go.mod h1:sIVyrIiJhuEF+Pj9Ebtd6P/rEYROXFi3BopGUQ5a5Og=
 github.com/go-logr/logr v1.4.2 h1:6pFjapn8bFcIbiKo3XT4j/BhANplGihG6tvd+8rYgrY=
