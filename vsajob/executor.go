@@ -511,6 +511,12 @@ func (e *executor) buildJob(
 	if memLimit, err := resource.ParseQuantity(jobOpts.MemoryLimit); err == nil {
 		resources.Limits[corev1.ResourceMemory] = memLimit
 	}
+	if ephemeralRequest, err := resource.ParseQuantity(jobOpts.EphemeralStorageRequest); err == nil {
+		resources.Requests[corev1.ResourceEphemeralStorage] = ephemeralRequest
+	}
+	if ephemeralLimit, err := resource.ParseQuantity(jobOpts.EphemeralStorageLimit); err == nil {
+		resources.Limits[corev1.ResourceEphemeralStorage] = ephemeralLimit
+	}
 
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
