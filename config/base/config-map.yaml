@@ -27,3 +27,4 @@ data:
   VSA_SIGNING_KEY_SECRET_NAME: "vsa-signing-key"
   VSA_UPLOAD_URL: "rekor@https://rekor.sigstore.dev"
   DEBUG: "true"
+  # TMP_STORAGE_SIZE: "2Gi"  # Optional: Size for /tmp storage (default: 1Gi)

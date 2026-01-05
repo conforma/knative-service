@@ -30,6 +30,7 @@ type jobOptions struct {
 	CPURequest         string // CPU resource request (Kubernetes quantity format, e.g., "100m")
 	MemoryRequest      string // Memory resource request (Kubernetes quantity format, e.g., "256Mi")
 	MemoryLimit        string // Memory resource limit (Kubernetes quantity format, e.g., "512Mi")
+	TmpStorageSize     string // Size for /tmp storage via emptyDir volume (Kubernetes quantity format, e.g., "2Gi")
 	BackoffLimit       *int32 // Number of retries before marking Job as failed (nil = use Kubernetes default)
 }
 
@@ -58,6 +59,7 @@ var defaultBackoffLimit = int32(2)
 //   - CPURequest: "100m" (0.1 CPU core)
 //   - MemoryRequest: "256Mi"
 //   - MemoryLimit: "512Mi"
+//   - TmpStorageSize: "1Gi" (1GB for /tmp storage via emptyDir volume)
 //   - BackoffLimit: 2 retries
 //
 // These defaults can be overridden via ConfigMap settings.
@@ -69,6 +71,7 @@ func defaultJobOptions(snapshot Snapshot) jobOptions {
 		CPURequest:         "100m",
 		MemoryRequest:      "256Mi",
 		MemoryLimit:        "512Mi",
+		TmpStorageSize:     "1Gi",
 		BackoffLimit:       &defaultBackoffLimit,
 	}
 }

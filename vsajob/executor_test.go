@@ -104,6 +104,16 @@ func TestCreateVSAJob(t *testing.T) {
 			expectedError: "invalid MEMORY_LIMIT value",
 		},
 		{
+			name:     "invalid value in config map: TMP_STORAGE_SIZE",
+			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
+			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
+				cm := createMockConfigMap("conforma", "vsa-config")
+				cm.Data["TMP_STORAGE_SIZE"] = "invalid-storage"
+				mockConfigMapGet(m, cm)
+			},
+			expectedError: "invalid TMP_STORAGE_SIZE value",
+		},
+		{
 			name:     "invalid value in config map: BACKOFF_LIMIT",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {

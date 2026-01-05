@@ -70,6 +70,7 @@
 //   - CPU_REQUEST: CPU resource request (default: "100m")
 //   - MEMORY_REQUEST: Memory resource request (default: "256Mi")
 //   - MEMORY_LIMIT: Memory resource limit (default: "512Mi")
+//   - TMP_STORAGE_SIZE: Size for /tmp storage via emptyDir volume (default: "1Gi")
 //   - BACKOFF_LIMIT: Job retry limit (default: 2)
 //   - WORKERS: Concurrent worker count for validation (default: "1")
 //   - STRICT: Enable strict validation mode (default: "false")
@@ -319,6 +320,7 @@ func (e *executor) loadConfigMap(ctx context.Context) (*corev1.ConfigMap, error)
 //   - GENERATOR_IMAGE: Container image for the Conforma CLI
 //   - SERVICE_ACCOUNT_NAME: Service account for Job pods
 //   - CPU_REQUEST, MEMORY_REQUEST, MEMORY_LIMIT: Resource requirements
+//   - TMP_STORAGE_SIZE: Size for /tmp storage via emptyDir volume
 //   - BACKOFF_LIMIT: Number of retries before marking Job as failed
 //
 // All resource quantities are validated using Kubernetes resource.ParseQuantity.
@@ -364,6 +366,12 @@ func (e *executor) loadJobOptions(ctx context.Context, snapshot Snapshot) (*jobO
 		}
 		backoffInt := int32(backoffQuantity.Value()) // #nosec G115 - backoffQuantity is a small config value
 		opts.BackoffLimit = &backoffInt
+	}
+	if v := cm.Data["TMP_STORAGE_SIZE"]; v != "" {
+		if _, err := resource.ParseQuantity(v); err != nil {
+			return nil, fmt.Errorf("invalid TMP_STORAGE_SIZE value %q: %w", v, err)
+		}
+		opts.TmpStorageSize = v
 	}
 
 	return &opts, nil
@@ -454,6 +462,7 @@ func (e *executor) loadVSAGenerationOptions(ctx context.Context) (*vsaGeneration
 //   - Access the signing key Secret directly via k8s:// format
 //   - Use the specified service account (which needs access to the signing key Secret)
 //   - Apply resource limits and requests from the configuration
+//   - Mount an emptyDir volume to /tmp with configurable storage size
 //   - Include labels and annotations for tracking and debugging
 //
 // The Job name is auto-generated as "vsa-gen-{snapshot-name}-{unix-timestamp}" to ensure uniqueness.
@@ -512,6 +521,22 @@ func (e *executor) buildJob(
 		resources.Limits[corev1.ResourceMemory] = memLimit
 	}
 
+	// Build volume for /tmp storage, ec creates its work dir there
+	tmpStorageQuantity := resource.MustParse(jobOpts.TmpStorageSize)
+	tmpVolume := corev1.Volume{
+		Name: "tmp-storage",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{
+				SizeLimit: &tmpStorageQuantity,
+			},
+		},
+	}
+
+	tmpVolumeMount := corev1.VolumeMount{
+		Name:      "tmp-storage",
+		MountPath: "/tmp",
+	}
+
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobOpts.JobName,
@@ -542,6 +567,9 @@ func (e *executor) buildJob(
 				Spec: corev1.PodSpec{
 					ServiceAccountName: jobOpts.ServiceAccountName,
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
+					Volumes: []corev1.Volume{
+						tmpVolume,
+					},
 					Containers: []corev1.Container{
 						{
 							Name:      "vsa-generator",
@@ -549,6 +577,9 @@ func (e *executor) buildJob(
 							Command:   []string{"ec"},
 							Args:      args,
 							Resources: resources,
+							VolumeMounts: []corev1.VolumeMount{
+								tmpVolumeMount,
+							},
 							Env: []corev1.EnvVar{
 								{
 									Name:  "HOME",
