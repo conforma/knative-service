@@ -104,6 +104,26 @@ func TestCreateVSAJob(t *testing.T) {
 			expectedError: "invalid MEMORY_LIMIT value",
 		},
 		{
+			name:     "invalid value in config map: EPHEMERAL_STORAGE_REQUEST",
+			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
+			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
+				cm := createMockConfigMap("conforma", "vsa-config")
+				cm.Data["EPHEMERAL_STORAGE_REQUEST"] = "invalid-storage"
+				mockConfigMapGet(m, cm)
+			},
+			expectedError: "invalid EPHEMERAL_STORAGE_REQUEST value",
+		},
+		{
+			name:     "invalid value in config map: EPHEMERAL_STORAGE_LIMIT",
+			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
+			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {
+				cm := createMockConfigMap("conforma", "vsa-config")
+				cm.Data["EPHEMERAL_STORAGE_LIMIT"] = "invalid-storage"
+				mockConfigMapGet(m, cm)
+			},
+			expectedError: "invalid EPHEMERAL_STORAGE_LIMIT value",
+		},
+		{
 			name:     "invalid value in config map: BACKOFF_LIMIT",
 			snapshot: createMockSnapshot("test-snapshot", "test-namespace", "test-app"),
 			setupClientExpectations: func(m *mocks.ControllerRuntimeClient) {

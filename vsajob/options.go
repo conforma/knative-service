@@ -24,13 +24,15 @@ import (
 // jobOptions contains Kubernetes Job configuration parameters.
 // These control how the VSA generation Job is created and executed.
 type jobOptions struct {
-	JobName            string // Unique name for the Job (auto-generated with timestamp)
-	GeneratorImage     string // Container image for the Conforma CLI
-	ServiceAccountName string // Service account for Job pods (needs Secret access)
-	CPURequest         string // CPU resource request (Kubernetes quantity format, e.g., "100m")
-	MemoryRequest      string // Memory resource request (Kubernetes quantity format, e.g., "256Mi")
-	MemoryLimit        string // Memory resource limit (Kubernetes quantity format, e.g., "512Mi")
-	BackoffLimit       *int32 // Number of retries before marking Job as failed (nil = use Kubernetes default)
+	JobName                 string // Unique name for the Job (auto-generated with timestamp)
+	GeneratorImage          string // Container image for the Conforma CLI
+	ServiceAccountName      string // Service account for Job pods (needs Secret access)
+	CPURequest              string // CPU resource request (Kubernetes quantity format, e.g., "100m")
+	MemoryRequest           string // Memory resource request (Kubernetes quantity format, e.g., "256Mi")
+	MemoryLimit             string // Memory resource limit (Kubernetes quantity format, e.g., "512Mi")
+	EphemeralStorageRequest string // Ephemeral storage resource request (Kubernetes quantity format, e.g., "2Gi")
+	EphemeralStorageLimit   string // Ephemeral storage resource limit (Kubernetes quantity format, e.g., "2Gi")
+	BackoffLimit            *int32 // Number of retries before marking Job as failed (nil = use Kubernetes default)
 }
 
 // vsaGenerationOptions contains VSA-specific configuration parameters.
@@ -58,18 +60,22 @@ var defaultBackoffLimit = int32(2)
 //   - CPURequest: "100m" (0.1 CPU core)
 //   - MemoryRequest: "256Mi"
 //   - MemoryLimit: "512Mi"
+//   - EphemeralStorageRequest: "2Gi" (2GB ephemeral storage request)
+//   - EphemeralStorageLimit: "2Gi" (2GB ephemeral storage limit)
 //   - BackoffLimit: 2 retries
 //
 // These defaults can be overridden via ConfigMap settings.
 func defaultJobOptions(snapshot Snapshot) jobOptions {
 	return jobOptions{
-		JobName:            fmt.Sprintf("vsa-gen-%s-%d", snapshot.Name, time.Now().Unix()),
-		GeneratorImage:     "quay.io/conforma/cli:latest",
-		ServiceAccountName: "conforma-vsa-generator",
-		CPURequest:         "100m",
-		MemoryRequest:      "256Mi",
-		MemoryLimit:        "512Mi",
-		BackoffLimit:       &defaultBackoffLimit,
+		JobName:                 fmt.Sprintf("vsa-gen-%s-%d", snapshot.Name, time.Now().Unix()),
+		GeneratorImage:          "quay.io/conforma/cli:latest",
+		ServiceAccountName:      "conforma-vsa-generator",
+		CPURequest:              "100m",
+		MemoryRequest:           "256Mi",
+		MemoryLimit:             "512Mi",
+		EphemeralStorageRequest: "2Gi",
+		EphemeralStorageLimit:   "2Gi",
+		BackoffLimit:            &defaultBackoffLimit,
 	}
 }
 

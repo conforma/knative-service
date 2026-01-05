@@ -70,6 +70,8 @@
 //   - CPU_REQUEST: CPU resource request (default: "100m")
 //   - MEMORY_REQUEST: Memory resource request (default: "256Mi")
 //   - MEMORY_LIMIT: Memory resource limit (default: "512Mi")
+//   - EPHEMERAL_STORAGE_REQUEST: Ephemeral storage resource request (default: "2Gi")
+//   - EPHEMERAL_STORAGE_LIMIT: Ephemeral storage resource limit (default: "2Gi")
 //   - BACKOFF_LIMIT: Job retry limit (default: 2)
 //   - WORKERS: Concurrent worker count for validation (default: "1")
 //   - STRICT: Enable strict validation mode (default: "false")
@@ -319,6 +321,7 @@ func (e *executor) loadConfigMap(ctx context.Context) (*corev1.ConfigMap, error)
 //   - GENERATOR_IMAGE: Container image for the Conforma CLI
 //   - SERVICE_ACCOUNT_NAME: Service account for Job pods
 //   - CPU_REQUEST, MEMORY_REQUEST, MEMORY_LIMIT: Resource requirements
+//   - EPHEMERAL_STORAGE_REQUEST, EPHEMERAL_STORAGE_LIMIT: Ephemeral storage requirements
 //   - BACKOFF_LIMIT: Number of retries before marking Job as failed
 //
 // All resource quantities are validated using Kubernetes resource.ParseQuantity.
@@ -356,6 +359,18 @@ func (e *executor) loadJobOptions(ctx context.Context, snapshot Snapshot) (*jobO
 			return nil, fmt.Errorf("invalid MEMORY_LIMIT value %q: %w", v, err)
 		}
 		opts.MemoryLimit = v
+	}
+	if v := cm.Data["EPHEMERAL_STORAGE_REQUEST"]; v != "" {
+		if _, err := resource.ParseQuantity(v); err != nil {
+			return nil, fmt.Errorf("invalid EPHEMERAL_STORAGE_REQUEST value %q: %w", v, err)
+		}
+		opts.EphemeralStorageRequest = v
+	}
+	if v := cm.Data["EPHEMERAL_STORAGE_LIMIT"]; v != "" {
+		if _, err := resource.ParseQuantity(v); err != nil {
+			return nil, fmt.Errorf("invalid EPHEMERAL_STORAGE_LIMIT value %q: %w", v, err)
+		}
+		opts.EphemeralStorageLimit = v
 	}
 	if v := cm.Data["BACKOFF_LIMIT"]; v != "" {
 		backoffQuantity, err := resource.ParseQuantity(v)
@@ -510,6 +525,12 @@ func (e *executor) buildJob(
 	}
 	if memLimit, err := resource.ParseQuantity(jobOpts.MemoryLimit); err == nil {
 		resources.Limits[corev1.ResourceMemory] = memLimit
+	}
+	if ephemeralRequest, err := resource.ParseQuantity(jobOpts.EphemeralStorageRequest); err == nil {
+		resources.Requests[corev1.ResourceEphemeralStorage] = ephemeralRequest
+	}
+	if ephemeralLimit, err := resource.ParseQuantity(jobOpts.EphemeralStorageLimit); err == nil {
+		resources.Limits[corev1.ResourceEphemeralStorage] = ephemeralLimit
 	}
 
 	return &batchv1.Job{

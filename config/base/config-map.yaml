@@ -27,3 +27,5 @@ data:
   VSA_SIGNING_KEY_SECRET_NAME: "vsa-signing-key"
   VSA_UPLOAD_URL: "rekor@https://rekor.sigstore.dev"
   DEBUG: "true"
+  # EPHEMERAL_STORAGE_REQUEST: "3Gi"  # Optional: Ephemeral storage request (default: 2Gi)
+  # EPHEMERAL_STORAGE_LIMIT: "3Gi"    # Optional: Ephemeral storage limit (default: 2Gi)
