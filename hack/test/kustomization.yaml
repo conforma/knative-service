@@ -23,7 +23,6 @@ kind: Kustomization
 # 2. Knative Eventing - for event sources and triggers
 # 3. Custom CRDs - for application resources (Snapshot, ReleasePlan, etc.)
 # 4. Registry - for container image storage
-# 5. Default Broker - for event routing
 
 resources:
   # NOTE: Knative Serving and Eventing are installed separately in kind.go
@@ -35,5 +34,5 @@ resources:
   - releaseplanadmission-crd.yaml
   - ../registry
 
-# NOTE: default-broker.yaml and Kourier networking configuration are applied
-# separately in kind.go after Knative Eventing and Serving are installed
+# NOTE: Kourier networking configuration is applied separately in kind.go
+# after Knative Eventing is installed

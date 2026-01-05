@@ -94,7 +94,7 @@ func verifyJobCreated(ctx context.Context) error {
 		}
 	}
 	if namespace == "" {
-		namespace = "default"
+		namespace = "conforma"
 	}
 
 	// Wait for Job to be created
@@ -404,7 +404,7 @@ func verifyMultipleJobs(ctx context.Context) error {
 // getNamespaceFromSnapshotState retrieves the namespace from snapshot state
 func getNamespaceFromSnapshotState(snapshotState *snapshot.SnapshotState) string {
 	if snapshotState == nil {
-		return "default"
+		return "conforma"
 	}
 
 	namespace := snapshotState.Namespace
@@ -416,7 +416,7 @@ func getNamespaceFromSnapshotState(snapshotState *snapshot.SnapshotState) string
 		}
 	}
 	if namespace == "" {
-		namespace = "default"
+		namespace = "conforma"
 	}
 	return namespace
 }

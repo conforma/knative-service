@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -261,7 +262,7 @@ func Start(givenCtx context.Context) (ctx context.Context, kCluster types.Cluste
 
 		// Install Knative components after base configuration
 		// This is done separately to avoid kustomize remote resource merging issues
-		logger.Info("📦 Installing Knative components (Serving and Eventing)...")
+		logger.Info("📦 Installing Knative Eventing...")
 		err = installKnativeComponents(ctx, &kCluster)
 		if err != nil {
 			logger.Errorf("Unable to install Knative components: %v", err)
@@ -568,16 +569,27 @@ func (k *kindCluster) CreateNamespace(ctx context.Context) (context.Context, err
 		return ctx, nil
 	}
 
+	// Todo: Should probably create this from the yaml data..?
 	namespace, err := k.client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "knative-test-",
+			Name: "conforma",
 		},
 	}, metav1.CreateOptions{})
 	if err != nil {
-		return ctx, err
+		// Check if namespace already exists (e.g., from GitOps deployment)
+		if strings.Contains(err.Error(), "already exists") {
+			// Namespace already exists, just get it
+			existingNS, getErr := k.client.CoreV1().Namespaces().Get(ctx, "conforma", metav1.GetOptions{})
+			if getErr != nil {
+				return ctx, fmt.Errorf("namespace exists but failed to get it: %w", getErr)
+			}
+			t.namespace = existingNS.GetName()
+		} else {
+			return ctx, err
+		}
+	} else {
+		t.namespace = namespace.GetName()
 	}
-
-	t.namespace = namespace.GetName()
 
 	return ctx, nil
 }
@@ -598,7 +610,7 @@ func (k *kindCluster) Clientset() *kubernetes.Clientset {
 	return k.client
 }
 
-// installKnativeComponents installs Knative Serving and Eventing components
+// installKnativeComponents installs Knative Eventing components
 // This is done separately from kustomization to avoid duplicate CRD issues
 func installKnativeComponents(ctx context.Context, k *kindCluster) error {
 	logger, ctx := log.LoggerFor(ctx)
@@ -652,7 +664,7 @@ func installKnativeComponents(ctx context.Context, k *kindCluster) error {
 			if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
 				namespace := obj.GetNamespace()
 				if namespace == "" {
-					namespace = "default"
+					namespace = "conforma"
 				}
 				c = c.(dynamic.NamespaceableResourceInterface).Namespace(namespace)
 			}
@@ -667,38 +679,6 @@ func installKnativeComponents(ctx context.Context, k *kindCluster) error {
 		}
 
 		return nil
-	}
-
-	// Install Knative Serving
-	logger.Info("Installing Knative Serving CRDs...")
-	if err := applyFromURL(fmt.Sprintf("https://github.com/knative/serving/releases/download/knative-%s/serving-crds.yaml", knativeVersion)); err != nil {
-		return err
-	}
-
-	// Wait a moment for the API server to register the new CRDs
-	logger.Info("Waiting for CRDs to be registered...")
-	time.Sleep(5 * time.Second)
-
-	// Refresh the REST mapper after installing CRDs so it knows about the new resource types
-	logger.Info("Refreshing REST mapper after installing Serving CRDs...")
-	if err := refreshRESTMapper(ctx, k); err != nil {
-		return fmt.Errorf("failed to refresh REST mapper: %w", err)
-	}
-
-	logger.Info("Installing Knative Serving core...")
-	if err := applyFromURL(fmt.Sprintf("https://github.com/knative/serving/releases/download/knative-%s/serving-core.yaml", knativeVersion)); err != nil {
-		return err
-	}
-
-	logger.Info("Installing Kourier networking...")
-	if err := applyFromURL(fmt.Sprintf("https://github.com/knative/net-kourier/releases/download/knative-%s/kourier.yaml", knativeVersion)); err != nil {
-		return err
-	}
-
-	// Configure Kourier as the ingress
-	logger.Info("Configuring Knative Serving to use Kourier...")
-	if err := patchConfigMapForKourier(ctx, k); err != nil {
-		return fmt.Errorf("failed to configure Kourier: %w", err)
 	}
 
 	// Install Knative Eventing
@@ -727,92 +707,13 @@ func installKnativeComponents(ctx context.Context, k *kindCluster) error {
 		return err
 	}
 
-	logger.Info("Installing MT Channel Broker...")
-	if err := applyFromURL(fmt.Sprintf("https://github.com/knative/eventing/releases/download/knative-%s/mt-channel-broker.yaml", knativeVersion)); err != nil {
-		return err
-	}
-
 	// Wait for Knative components to be ready
-	logger.Info("⏳ Waiting for Knative Serving to be ready...")
-	if err := waitForAvailableDeploymentsIn(ctx, k, "knative-serving", "kourier-system"); err != nil {
-		return fmt.Errorf("Knative Serving not ready: %w", err)
-	}
-
 	logger.Info("⏳ Waiting for Knative Eventing to be ready...")
 	if err := waitForAvailableDeploymentsIn(ctx, k, "knative-eventing"); err != nil {
 		return fmt.Errorf("Knative Eventing not ready: %w", err)
 	}
 
-	// Now that Knative Eventing is ready, apply the default broker
-	logger.Info("Creating default broker...")
-	if err := createDefaultBroker(ctx, k); err != nil {
-		return fmt.Errorf("failed to create default broker: %w", err)
-	}
-
-	logger.Info("Knative components installed successfully")
-	return nil
-}
-
-// patchConfigMapForKourier patches the Knative Serving config-network ConfigMap to use Kourier
-func patchConfigMapForKourier(ctx context.Context, k *kindCluster) error {
-	configMap, err := k.client.CoreV1().ConfigMaps("knative-serving").Get(ctx, "config-network", metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get config-network ConfigMap: %w", err)
-	}
-
-	if configMap.Data == nil {
-		configMap.Data = make(map[string]string)
-	}
-
-	configMap.Data["ingress-class"] = "kourier.ingress.networking.knative.dev"
-
-	_, err = k.client.CoreV1().ConfigMaps("knative-serving").Update(ctx, configMap, metav1.UpdateOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to update config-network ConfigMap: %w", err)
-	}
-
-	return nil
-}
-
-// createDefaultBroker creates a default Broker in the default namespace
-func createDefaultBroker(ctx context.Context, k *kindCluster) error {
-	broker := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "eventing.knative.dev/v1",
-			"kind":       "Broker",
-			"metadata": map[string]interface{}{
-				"name":      "default",
-				"namespace": "default",
-			},
-			"spec": map[string]interface{}{
-				"config": map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "ConfigMap",
-					"name":       "config-br-default-channel",
-					"namespace":  "knative-eventing",
-				},
-			},
-		},
-	}
-
-	mapping, err := k.mapper.RESTMapping(broker.GroupVersionKind().GroupKind())
-	if err != nil {
-		return fmt.Errorf("failed to get REST mapping for Broker: %w", err)
-	}
-
-	_, err = k.dynamic.Resource(mapping.Resource).Namespace("default").Apply(
-		ctx,
-		"default",
-		broker,
-		metav1.ApplyOptions{
-			FieldManager: "kind-acceptance-test",
-			Force:        true,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create default broker: %w", err)
-	}
-
+	logger.Info("Knative Eventing installed successfully")
 	return nil
 }
 

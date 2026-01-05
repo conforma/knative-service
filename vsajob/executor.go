@@ -140,7 +140,7 @@ type executor struct {
 //   - logger: A logr.Logger instance for structured logging
 //
 // Returns an Executor with default configuration:
-//   - Namespace: "default"
+//   - Namespace: "conforma"
 //   - ConfigMap name: "vsa-config"
 //
 // Use WithNamespace() and WithConfigMapName() to customize these defaults.
@@ -173,7 +173,7 @@ func NewExecutor(
 		logger:        logger,
 		policyFinder:  newPolicyFinder(client, logger),
 		configMapName: "vsa-config",
-		namespace:     "default",
+		namespace:     "conforma",
 	}
 }
 
@@ -199,7 +199,7 @@ func (e *executor) WithConfigMapName(configMapName string) Executor {
 // This is NOT the namespace where Jobs will be created - Jobs are created in the
 // snapshot's namespace.
 //
-// Default: "default"
+// Default: "conforma"
 //
 // Tip: Use os.Getenv("POD_NAMESPACE") or the Kubernetes downward API to automatically
 // detect the service's namespace in production environments.
@@ -451,7 +451,7 @@ func (e *executor) loadVSAGenerationOptions(ctx context.Context) (*vsaGeneration
 // The Job will:
 //   - Run in the snapshot's namespace (not the service's namespace)
 //   - Execute the Conforma CLI with the "ec validate image" command
-//   - Mount the signing key Secret as a volume at /workspace/signing-key
+//   - Access the signing key Secret directly via k8s:// format
 //   - Use the specified service account (which needs access to the signing key Secret)
 //   - Apply resource limits and requests from the configuration
 //   - Include labels and annotations for tracking and debugging
@@ -471,8 +471,6 @@ func (e *executor) buildJob(
 	jobOpts jobOptions,
 	vsaOpts vsaGenerationOptions,
 ) *batchv1.Job {
-	signingKeyMountPath := "/workspace/signing-key"
-
 	args := []string{
 		"validate",
 		"image",
@@ -491,9 +489,8 @@ func (e *executor) buildJob(
 		"text",
 		"--vsa",
 		"--vsa-signing-key",
-		// The key filename comes from the Secret data key. When a Secret is mounted as a volume,
-		// each key in the Secret's data becomes a file. The Secret must have a data key named "cosign.key".
-		signingKeyMountPath + "/cosign.key",
+		// Once https://github.com/conforma/cli/pull/3067 is merged we can remove the "cosign.key" part
+		fmt.Sprintf("k8s://%s/%s/cosign.key", e.namespace, vsaOpts.VSASigningKeySecretName),
 		"--vsa-upload",
 		vsaOpts.VSAUploadURL,
 		"--show-successes",
@@ -557,21 +554,6 @@ func (e *executor) buildJob(
 									Name:  "HOME",
 									Value: "/tmp",
 								},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "signing-key",
-									MountPath: signingKeyMountPath,
-									ReadOnly:  true,
-								},
-							},
-						},
-					},
-					Volumes: []corev1.Volume{
-						{
-							Name: "signing-key",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{SecretName: vsaOpts.VSASigningKeySecretName},
 							},
 						},
 					},
