@@ -62,9 +62,9 @@
 // Required ConfigMap fields:
 //   - PUBLIC_KEY: Public key for signature verification
 //   - VSA_UPLOAD_URL: URL endpoint for uploading generated VSAs (e.g., Rekor)
-//   - VSA_SIGNING_KEY_SECRET_NAME: Name of the Kubernetes Secret containing the signing key
 //
 // Optional ConfigMap fields (with defaults):
+//   - VSA_SIGNING_KEY_SECRET_NAME: Name of the Kubernetes Secret containing the signing key (default: "vsa-signing-key")
 //   - GENERATOR_IMAGE: Container image for the Conforma CLI (default: "quay.io/conforma/cli:latest")
 //   - SERVICE_ACCOUNT_NAME: Service account for Job pods (default: "conforma-vsa-generator")
 //   - CPU_REQUEST: CPU resource request (default: "100m")
@@ -374,9 +374,9 @@ func (e *executor) loadJobOptions(ctx context.Context, snapshot Snapshot) (*jobO
 // Required fields (will return error if missing):
 //   - PUBLIC_KEY: Public key for verifying image signatures
 //   - VSA_UPLOAD_URL: Endpoint URL for uploading generated VSAs (typically Rekor)
-//   - VSA_SIGNING_KEY_SECRET_NAME: Name of Secret containing the cosign private key
 //
 // Optional fields (with defaults):
+//   - VSA_SIGNING_KEY_SECRET_NAME: Name of Secret containing the cosign private key (default: "vsa-signing-key")
 //   - WORKERS: Number of concurrent workers for validation (default: "1")
 //   - STRICT: Enable strict validation mode - fail on any policy violation (default: "false")
 //   - IGNORE_REKOR: Skip Rekor transparency log verification (default: "false")
@@ -402,7 +402,7 @@ func (e *executor) loadVSAGenerationOptions(ctx context.Context) (*vsaGeneration
 	}
 	signingKeySecretName := cm.Data["VSA_SIGNING_KEY_SECRET_NAME"]
 	if signingKeySecretName == "" {
-		return nil, fmt.Errorf("VSA_SIGNING_KEY_SECRET_NAME is required in ConfigMap")
+		signingKeySecretName = "vsa-signing-key" //gosec:disable G101
 	}
 
 	// Start with defaults
