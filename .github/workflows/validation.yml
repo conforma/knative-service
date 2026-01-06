@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: '1.24.7'
+  GO_VERSION: '1.25.0'
   GOSEC_VERSION: 'c9453023c4e81ebdb6dde29e22d9cd5e2285fb16' # v2.22.8
 
 permissions:

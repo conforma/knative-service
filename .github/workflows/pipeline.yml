@@ -28,7 +28,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: '1.24.7'
+  GO_VERSION: '1.25.0'
   QUAY_REPOSITORY: 'quay.io/conforma/knative-service'
   GOSEC_VERSION: 'c9453023c4e81ebdb6dde29e22d9cd5e2285fb16' # v2.22.8
   KO_VERSION: 'v0.18.0'  # Pin ko version for reproducibility

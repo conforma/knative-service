@@ -19,5 +19,5 @@
 package tools
 
 import (
-	_ "github.com/google/addlicense/cmd/addlicense"
+	_ "github.com/google/addlicense"
 )
