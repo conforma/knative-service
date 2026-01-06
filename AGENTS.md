@@ -7,7 +7,7 @@ This file provides guidance to AI coding agents (Claude Code, GitHub Copilot, Cu
 This is a Kubernetes-native, event-driven service that automatically triggers enterprise contract verification for application snapshots using Tekton bundles. It listens for CloudEvents when Snapshot resources are created and automatically creates Tekton TaskRuns for compliance verification.
 
 **Key Tech Stack:**
-- Go 1.24.7
+- Go 1.25.0
 - Knative Eventing (CloudEvents-based)
 - Tekton Pipelines (TaskRun execution)
 - Kubernetes client-go and controller-runtime
