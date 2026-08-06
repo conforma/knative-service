@@ -20,6 +20,7 @@ metadata:
   name: conforma-knative-service
   namespace: conforma
 ---
+# Controller namespace Role: ConfigMap reads and Job management in conforma ns
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -46,7 +47,7 @@ roleRef:
   name: conforma-knative-service
   apiGroup: rbac.authorization.k8s.io
 ---
-# ClusterRole for cross-namespace access to resources
+# ClusterRole: cross-namespace access to Konflux CRDs only
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -55,18 +56,6 @@ rules:
   - apiGroups: ["appstudio.redhat.com"]
     resources: ["snapshots", "releaseplans", "releaseplanadmissions", "enterprisecontractpolicies"]
     verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["secrets", "configmaps"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "list", "watch", "create", "update", "patch"]
-  - apiGroups: [""]
-    resources: ["pods/log"]
-    verbs: ["get", "list"]
-  - apiGroups: ["batch"]
-    resources: ["jobs"]
-    verbs: ["create", "get", "list", "watch", "update", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -88,18 +77,58 @@ metadata:
   name: conforma-vsa-generator
   namespace: conforma
 ---
-# ClusterRoleBinding to give job pods the same permissions as the controller
-# Jobs now run in conforma namespace and need cluster-wide access to read
-# snapshots, policies, and secrets from any namespace
+# Job SA: get the VSA signing key in conforma namespace.
+# If VSA_SIGNING_KEY_SECRET_NAME is changed in the ConfigMap,
+# update resourceNames here to match.
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: Role
 metadata:
-  name: conforma-vsa-generator-cluster
+  name: conforma-vsa-generator
+  namespace: conforma
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["vsa-signing-key"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: conforma-vsa-generator
+  namespace: conforma
 subjects:
   - kind: ServiceAccount
     name: conforma-vsa-generator
     namespace: conforma
 roleRef:
-  kind: ClusterRole
-  name: conforma-knative-service-cluster
+  kind: Role
+  name: conforma-vsa-generator
+  apiGroup: rbac.authorization.k8s.io
+---
+# Job SA: get the public verification key in openshift-pipelines namespace.
+# If PUBLIC_KEY is changed in the ConfigMap to reference a different
+# secret name or namespace, update this Role/RoleBinding to match.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: conforma-vsa-generator
+  namespace: openshift-pipelines
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["public-key"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: conforma-vsa-generator
+  namespace: openshift-pipelines
+subjects:
+  - kind: ServiceAccount
+    name: conforma-vsa-generator
+    namespace: conforma
+roleRef:
+  kind: Role
+  name: conforma-vsa-generator
   apiGroup: rbac.authorization.k8s.io
