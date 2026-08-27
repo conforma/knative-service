@@ -1,5 +1,19 @@
 # Conforma Knative Service
 
+> [!WARNING]
+> **Archived — experimental, not actively maintained.**
+>
+> This repository captured a development idea: an event-driven approach, built
+> on Knative eventing, for automatically generating Verification Summary
+> Attestations (VSAs) / triggering enterprise contract verification. It was
+> **never deployed to production**. The team explored the approach over a few
+> sprints and has since moved on; it is shelved for now and the repository is
+> archived to preserve the work for future reference. The approach may be
+> revisited later.
+>
+> Everything below (overview, quick start, deployment, and configuration) is
+> retained for historical reference only and is no longer supported.
+
 A Kubernetes-native, event-driven service that automatically triggers enterprise contract verification for application snapshots using Tekton bundles.
 
 ## Overview
