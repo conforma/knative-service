@@ -41,7 +41,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
     - name: Set up Go
       uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
@@ -49,7 +49,7 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
 
     - name: Cache Go modules
-      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: |
           ~/go/pkg/mod
@@ -86,7 +86,7 @@ jobs:
         go tool cover -html=coverage.out -o coverage.html
 
     - name: Upload coverage reports
-      uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+      uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       if: always()
       with:
         files: ./coverage.out
@@ -94,7 +94,7 @@ jobs:
         name: codecov-umbrella
 
     - name: Run linter
-      uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+      uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9.2.1
       with:
         version: latest
         args: --timeout=5m
